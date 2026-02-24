@@ -1,18 +1,14 @@
 import React from 'react';
-import { CheckCircle2, Clock, Building2, MoreVertical, Sparkles, Loader2 } from 'lucide-react';
+import { CheckCircle2, Clock, Building2, MoreVertical } from 'lucide-react';
 import { Transaction } from '../types';
 
 interface TransactionTableProps {
   transactions: Transaction[];
-  categorizingId?: number | null;
-  onCategorize: (id: number, desc: string) => void;
   onDelete: (id: number) => void;
 }
 
 export const TransactionTable: React.FC<TransactionTableProps> = ({
   transactions,
-  categorizingId,
-  onCategorize,
   onDelete
 }) => {
   if (transactions.length === 0) {
@@ -55,20 +51,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
                     >
                       {transaction.cat}
                     </span>
-                    {transaction.cat === 'Pendente' && (
-                      <button
-                        onClick={() => onCategorize(transaction.id, transaction.desc)}
-                        disabled={categorizingId === transaction.id}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-emerald-500 hover:text-emerald-700 p-1"
-                        aria-label="Categorizar com IA"
-                      >
-                        {categorizingId === transaction.id ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Sparkles className="w-3 h-3" />
-                        )}
-                      </button>
-                    )}
+                      {/* Categorizar com IA removido — categoria deve ser gerenciada manualmente ou via plano de contas */}
                   </div>
                   <span className="text-[10px] text-gray-300 flex items-center mt-1 uppercase font-bold">
                     <Building2 className="w-3 h-3 mr-1" /> {transaction.account}
