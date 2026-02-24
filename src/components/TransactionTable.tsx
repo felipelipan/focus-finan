@@ -1,9 +1,11 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Check, CheckCheck, Trash2, MoreVertical, Pencil } from 'lucide-react';
 import { Transaction } from '../types';
+import { Categoria } from './PlanoContas';
 
 interface Props {
   transactions: Transaction[];
+  categorias: Categoria[];
   onDelete: (id: number) => void;
   onEdit: (updated: Transaction) => void;
 }
@@ -81,7 +83,7 @@ function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => voi
   );
 }
 
-export function TransactionTable({ transactions, onDelete, onEdit }: Props) {
+export function TransactionTable({ transactions, categorias, onDelete, onEdit }: Props) {
   const [filter, setFilter]               = useState<FilterType>('all');
   const [selected, setSelected]           = useState<Set<number>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -383,12 +385,36 @@ export function TransactionTable({ transactions, onDelete, onEdit }: Props) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Categoria</label>
-                  <input
-                    type="text"
-                    value={editForm.cat}
-                    onChange={e => setEditForm({ ...editForm, cat: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
+                  {(() => {
+                    const catsDoTipo = categorias.filter(c =>
+                      editForm.type === 'expense' ? c.tipo === 'despesa' : c.tipo === 'receita'
+                    );
+                    const opcoes = catsDoTipo.flatMap(c => [
+                      { label: c.nome, value: c.nome, cor: c.cor },
+                      ...c.subcategorias.map(s => ({ label: '  ↳ ' + s.nome, value: s.nome, cor: s.cor })),
+                    ]);
+                    const corAtual = opcoes.find(o => o.value === editForm.cat)?.cor;
+                    return (
+                      <div className="relative flex items-center">
+                        {corAtual && (
+                          <span className="absolute left-3 w-3 h-3 rounded-full pointer-events-none z-10"
+                            style={{ backgroundColor: corAtual }} />
+                        )}
+                        <select
+                          value={editForm.cat}
+                          onChange={e => setEditForm({ ...editForm, cat: e.target.value })}
+                          className={"w-full border border-gray-200 rounded-lg py-2 pr-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 " + (corAtual ? 'pl-8' : 'pl-3')}
+                        >
+                          {!opcoes.find(o => o.value === editForm.cat) && (
+                            <option value={editForm.cat}>{editForm.cat}</option>
+                          )}
+                          {opcoes.map(op => (
+                            <option key={op.value} value={op.value}>{op.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Conta</label>

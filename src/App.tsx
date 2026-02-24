@@ -285,39 +285,39 @@ function AppContent(): JSX.Element {
 
   // Transações locais — funcionam mesmo sem backend
   // Carrega do localStorage, usa initialTransactions como fallback na primeira vez
-const [localTransactions, setLocalTransactions] = useState<Transaction[]>(() => {
-  try {
-    const saved = localStorage.getItem('focusfinan:transactions');
-    return saved ? JSON.parse(saved) : initialTransactions;
-  } catch { return initialTransactions; }
-});
+  const [localTransactions, setLocalTransactions] = useState<Transaction[]>(() => {
+    try {
+      const saved = localStorage.getItem('focusfinan:transactions');
+      return saved ? JSON.parse(saved) : initialTransactions;
+    } catch { return initialTransactions; }
+  });
 
-const [nextId, setNextId] = useState<number>(() => {
-  try {
-    const saved = localStorage.getItem('focusfinan:nextId');
-    return saved ? Number(saved) : initialTransactions.length + 1;
-  } catch { return initialTransactions.length + 1; }
-});
+  const [nextId, setNextId] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('focusfinan:nextId');
+      return saved ? Number(saved) : initialTransactions.length + 1;
+    } catch { return initialTransactions.length + 1; }
+  });
 
-const [categorias, setCategorias] = useState<Categoria[]>(() => {
-  try {
-    const saved = localStorage.getItem('focusfinan:categorias');
-    return saved ? JSON.parse(saved) : initialCategorias;
-  } catch { return initialCategorias; }
-});
+  const [categorias, setCategorias] = useState<Categoria[]>(() => {
+    try {
+      const saved = localStorage.getItem('focusfinan:categorias');
+      return saved ? JSON.parse(saved) : initialCategorias;
+    } catch { return initialCategorias; }
+  });
 
-// Salva automaticamente no localStorage sempre que mudar
-useEffect(() => {
-  localStorage.setItem('focusfinan:transactions', JSON.stringify(localTransactions));
-}, [localTransactions]);
+  // Salva automaticamente no localStorage sempre que mudar
+  useEffect(() => {
+    localStorage.setItem('focusfinan:transactions', JSON.stringify(localTransactions));
+  }, [localTransactions]);
 
-useEffect(() => {
-  localStorage.setItem('focusfinan:nextId', String(nextId));
-}, [nextId]);
+  useEffect(() => {
+    localStorage.setItem('focusfinan:nextId', String(nextId));
+  }, [nextId]);
 
-useEffect(() => {
-  localStorage.setItem('focusfinan:categorias', JSON.stringify(categorias));
-}, [categorias]);
+  useEffect(() => {
+    localStorage.setItem('focusfinan:categorias', JSON.stringify(categorias));
+  }, [categorias]);
 
   const API_BASE = import.meta.env.VITE_API_URL ?? '';
   const financeData = useFinanceData(localTransactions, API_BASE);
@@ -1050,6 +1050,7 @@ useEffect(() => {
 
               <TransactionTable
                 transactions={localTransactions}
+                categorias={categorias}
                 onDelete={(id) => setLocalTransactions(prev => prev.filter(t => t.id !== id))}
                 onEdit={(updated) => setLocalTransactions(prev => prev.map(t => t.id === updated.id ? updated : t))}
               />
@@ -1124,38 +1125,83 @@ useEffect(() => {
         {isImportOpen && importPreview && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/40" onClick={() => setIsImportOpen(false)} />
-            <div className="bg-white rounded-xl shadow-xl p-6 z-10 w-full max-w-2xl max-h-[80vh] flex flex-col">
-              <h3 className="text-lg font-bold mb-4">Prévia da importação ({importPreview.length} itens)</h3>
-              <div className="flex-1 overflow-y-auto text-sm">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="py-2 pr-4">Data</th>
-                      <th className="py-2 pr-4">Descrição</th>
-                      <th className="py-2 pr-4">Categoria</th>
-                      <th className="py-2 text-right">Valor</th>
+            <div className="bg-white rounded-xl shadow-xl p-6 z-10 w-full max-w-3xl max-h-[85vh] flex flex-col">
+              <div className="mb-4">
+                <h3 className="text-base font-bold text-gray-800">Prévia da importação — {importPreview.length} transações</h3>
+                <p className="text-xs text-gray-400 mt-1">Você pode ajustar a categoria de cada item antes de importar.</p>
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead className="sticky top-0 bg-white shadow-sm">
+                    <tr className="border-b border-gray-200">
+                      <th className="py-2 px-2 text-xs font-semibold text-gray-500 whitespace-nowrap">Data</th>
+                      <th className="py-2 px-2 text-xs font-semibold text-gray-500">Descrição</th>
+                      <th className="py-2 px-2 text-xs font-semibold text-gray-500 w-48">Categoria</th>
+                      <th className="py-2 px-2 text-xs font-semibold text-gray-500 text-right whitespace-nowrap">Valor</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {importPreview.map((item, i) => (
-                      <tr key={i} className="border-b hover:bg-gray-50">
-                        <td className="py-1 pr-4 text-gray-500">{item.date}</td>
-                        <td className="py-1 pr-4">{item.desc}</td>
-                        <td className="py-1 pr-4 text-gray-500">{item.cat}</td>
-                        <td className={`py-1 text-right font-medium ${Number(item.value) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                          R$ {Math.abs(Number(item.value)).toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
+                    {importPreview.map((item, i) => {
+                      // monta opções filtradas pelo tipo da linha
+                      const catsDoTipo = categorias.filter(c =>
+                        item.type === 'expense' ? c.tipo === 'despesa' : c.tipo === 'receita'
+                      );
+                      const opcoes = catsDoTipo.flatMap(c => [
+                        { label: c.nome,            value: c.nome, cor: c.cor },
+                        ...c.subcategorias.map(s => ({ label: '  ↳ ' + s.nome, value: s.nome, cor: s.cor })),
+                      ]);
+                      const corAtual = opcoes.find(o => o.value === item.cat)?.cor;
+
+                      return (
+                        <tr key={i} className={`border-b border-gray-50 hover:bg-gray-50/60 ${i % 2 === 0 ? '' : 'bg-gray-50/30'}`}>
+                          <td className="py-1.5 px-2 text-xs text-gray-400 whitespace-nowrap">{item.date}</td>
+                          <td className="py-1.5 px-2 text-xs text-gray-700 max-w-[180px]">
+                            <span className="block truncate">{item.desc}</span>
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <div className="relative flex items-center">
+                              {corAtual && (
+                                <span
+                                  className="absolute left-2 w-2.5 h-2.5 rounded-full pointer-events-none z-10"
+                                  style={{ backgroundColor: corAtual }}
+                                />
+                              )}
+                              <select
+                                value={item.cat}
+                                onChange={e => {
+                                  const updated = [...importPreview];
+                                  updated[i] = { ...updated[i], cat: e.target.value };
+                                  setImportPreview(updated);
+                                }}
+                                className={"w-full border border-gray-200 rounded-md py-1 pr-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white " + (corAtual ? 'pl-7' : 'pl-2')}
+                              >
+                                {/* garante que a categoria atual aparece mesmo se não estiver no plano de contas */}
+                                {!opcoes.find(o => o.value === item.cat) && (
+                                  <option value={item.cat}>{item.cat}</option>
+                                )}
+                                {opcoes.map(op => (
+                                  <option key={op.value} value={op.value}>{op.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </td>
+                          <td className={`py-1.5 px-2 text-right text-xs font-semibold whitespace-nowrap ${Number(item.value) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                            {Number(item.value) >= 0 ? '+' : '-'} R$ {Math.abs(Number(item.value)).toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => setIsImportOpen(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">
+
+              <div className="flex gap-2 mt-4 pt-3 border-t border-gray-100">
+                <button onClick={() => setIsImportOpen(false)} className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
                   Cancelar
                 </button>
                 <button onClick={saveImported} className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600">
-                  Importar tudo
+                  Importar {importPreview.length} transações
                 </button>
               </div>
             </div>
