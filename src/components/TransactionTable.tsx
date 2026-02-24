@@ -1,103 +1,493 @@
-import React from 'react';
-import { CheckCircle2, Clock, Building2, MoreVertical } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Check, CheckCheck, Trash2, MoreVertical, Pencil } from 'lucide-react';
 import { Transaction } from '../types';
 
-interface TransactionTableProps {
+interface Props {
   transactions: Transaction[];
   onDelete: (id: number) => void;
+  onEdit: (updated: Transaction) => void;
 }
 
-export const TransactionTable: React.FC<TransactionTableProps> = ({
-  transactions,
-  onDelete
-}) => {
-  if (transactions.length === 0) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-        <p className="text-gray-500">Nenhum lançamento encontrado</p>
-      </div>
-    );
-  }
+type FilterType = 'all' | 'pending' | 'confirmed';
+
+const STATUS_COLORS: Record<string, string> = {
+  pending:    'bg-red-500',
+  scheduled:  'bg-yellow-400',
+  confirmed:  'bg-blue-500',
+  reconciled: 'bg-emerald-500',
+};
+
+function formatBRL(value: number): string {
+  return Math.abs(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+}
+
+// Converte DD/MM/YY → YYYY-MM-DD para o input date
+function brToIso(br: string): string {
+  const p = br.split('/');
+  if (p.length < 3) return '';
+  let y = Number(p[2]); if (y < 100) y += 2000;
+  return `${y}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+}
+
+// Converte YYYY-MM-DD → DD/MM/YY
+function isoToBr(iso: string): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${String(y).slice(-2)}`;
+}
+
+// Menu dropdown por linha
+function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-      <table className="w-full text-left border-collapse min-w-[800px]">
-        <thead>
-          <tr className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-            <th className="px-6 py-4">Data</th>
-            <th className="px-6 py-4">Descrição</th>
-            <th className="px-6 py-4">Categoria / Conta</th>
-            <th className="px-6 py-4 text-right">Valor</th>
-            <th className="px-6 py-4 text-center">Status</th>
-            <th className="px-6 py-4"></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {transactions.map((transaction) => (
-            <tr key={transaction.id} className="hover:bg-gray-50/50 transition-colors group">
-              <td className="px-6 py-4 text-sm text-gray-500 font-medium">{transaction.date}</td>
-              <td className="px-6 py-4">
-                <div className="text-sm font-bold text-gray-700">{transaction.desc}</div>
-              </td>
-              <td className="px-6 py-4">
-                <div className="flex flex-col items-start">
-                  <div className="flex items-center group/cat">
-                    <span
-                      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded shadow-sm mr-2 ${
-                        transaction.cat === 'Pendente'
-                          ? 'bg-amber-100 text-amber-600'
-                          : 'bg-gray-100 text-gray-500'
-                      }`}
-                    >
-                      {transaction.cat}
-                    </span>
-                      {/* Categorizar com IA removido — categoria deve ser gerenciada manualmente ou via plano de contas */}
-                  </div>
-                  <span className="text-[10px] text-gray-300 flex items-center mt-1 uppercase font-bold">
-                    <Building2 className="w-3 h-3 mr-1" /> {transaction.account}
-                  </span>
-                </div>
-              </td>
-              <td
-                className={`px-6 py-4 text-sm font-bold text-right ${
-                  transaction.type === 'income' ? 'text-emerald-500' : 'text-rose-500'
-                }`}
-              >
-                {transaction.type === 'income' ? '' : '-'} R${' '}
-                {Math.abs(transaction.value).toLocaleString('pt-BR', {
-                  minimumFractionDigits: 2
-                })}
-              </td>
-              <td className="px-6 py-4 text-center">
-                <div className="flex justify-center">
-                  <span
-                    className={`inline-flex items-center justify-center w-8 h-8 rounded-full ${
-                      transaction.status === 'confirmed'
-                        ? 'bg-emerald-50 text-emerald-500'
-                        : 'bg-amber-50 text-amber-400'
-                    }`}
-                  >
-                    {transaction.status === 'confirmed' ? (
-                      <CheckCircle2 className="w-5 h-5" />
-                    ) : (
-                      <Clock className="w-5 h-5" />
-                    )}
-                  </span>
-                </div>
-              </td>
-              <td className="px-6 py-4 text-right">
-                <button
-                  onClick={() => onDelete(transaction.id)}
-                  className="p-2 rounded-lg hover:bg-gray-100 text-gray-300 opacity-0 group-hover:opacity-100 transition-all"
-                  aria-label="Deletar transação"
-                >
-                  <MoreVertical className="w-4 h-4" />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div ref={ref} className="relative" onClick={e => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="p-1.5 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-all"
+      >
+        <MoreVertical className="w-4 h-4" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg z-30 w-40 py-1 overflow-hidden">
+          <button
+            onClick={() => { onEdit(); setOpen(false); }}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <Pencil className="w-3.5 h-3.5 text-gray-400" />
+            Editar
+          </button>
+          <div className="border-t border-gray-100 mx-2" />
+          <button
+            onClick={() => { onDelete(); setOpen(false); }}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Excluir
+          </button>
+        </div>
+      )}
     </div>
   );
-};
+}
+
+export function TransactionTable({ transactions, onDelete, onEdit }: Props) {
+  const [filter, setFilter]               = useState<FilterType>('all');
+  const [selected, setSelected]           = useState<Set<number>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editingTx, setEditingTx]         = useState<Transaction | null>(null);
+  const [editForm, setEditForm]           = useState<any>(null);
+
+  // Filtra
+  const filtered = useMemo(() => {
+    if (filter === 'pending')   return transactions.filter(t => t.status === 'pending');
+    if (filter === 'confirmed') return transactions.filter(t => t.status === 'confirmed');
+    return transactions;
+  }, [transactions, filter]);
+
+  // Ordena por data
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const parse = (d: string) => {
+        const p = d.split('/');
+        if (p.length < 3) return 0;
+        let y = Number(p[2]); if (y < 100) y += 2000;
+        return new Date(y, Number(p[1]) - 1, Number(p[0])).getTime();
+      };
+      return parse(a.date) - parse(b.date);
+    });
+  }, [filtered]);
+
+  // Saldo acumulado
+  const rows = useMemo(() => {
+    let saldo = 0;
+    return sorted.map(t => {
+      saldo += Number(t.value);
+      return { ...t, saldoAcumulado: saldo };
+    });
+  }, [sorted]);
+
+  // Totais
+  const totalEntradas = transactions.filter(t => t.value > 0).reduce((a, t) => a + t.value, 0);
+  const totalSaidas   = transactions.filter(t => t.value < 0).reduce((a, t) => a + Math.abs(t.value), 0);
+  const resultado     = totalEntradas - totalSaidas;
+
+  // Seleção
+  const allIds       = rows.map(t => t.id);
+  const allSelected  = allIds.length > 0 && allIds.every(id => selected.has(id));
+  const someSelected = selected.size > 0;
+
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(allIds));
+  const toggleOne = (id: number) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const handleDeleteSelected = () => {
+    selected.forEach(id => onDelete(id));
+    setSelected(new Set());
+    setConfirmDelete(false);
+  };
+
+  // Edição
+  const openEdit = (t: Transaction) => {
+    setEditingTx(t);
+    setEditForm({
+      date:    brToIso(t.date),
+      desc:    t.desc,
+      cat:     t.cat,
+      account: t.account,
+      type:    t.type,
+      status:  t.status,
+      value:   String(Math.abs(t.value)),
+    });
+  };
+
+  const saveEdit = () => {
+    if (!editingTx || !editForm) return;
+    const updated: Transaction = {
+      ...editingTx,
+      date:    isoToBr(editForm.date),
+      desc:    editForm.desc,
+      cat:     editForm.cat,
+      account: editForm.account,
+      type:    editForm.type,
+      status:  editForm.status,
+      value:   editForm.type === 'income'
+        ? Math.abs(Number(editForm.value))
+        : -Math.abs(Number(editForm.value)),
+    };
+    onEdit(updated);
+    setEditingTx(null);
+    setEditForm(null);
+  };
+
+  return (
+    <div className="flex gap-4">
+
+      {/* Painel lateral — Resultados */}
+      <div className="w-56 flex-shrink-0">
+        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm text-sm">
+          <div className="font-semibold text-gray-700 mb-3">Resultados (R$)</div>
+          <div className="space-y-1">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Entradas</span>
+              <span className="text-emerald-600 font-medium">{formatBRL(totalEntradas)}</span>
+            </div>
+            <div className="flex justify-between pl-3">
+              <span className="text-gray-400 text-xs">Receitas</span>
+              <span className="text-emerald-500 text-xs">{formatBRL(totalEntradas)}</span>
+            </div>
+            <div className="flex justify-between pl-3">
+              <span className="text-gray-400 text-xs">Transferências</span>
+              <span className="text-gray-400 text-xs">0,00</span>
+            </div>
+            <div className="flex justify-between mt-2">
+              <span className="text-gray-500">Saídas</span>
+              <span className="text-red-500 font-medium">-{formatBRL(totalSaidas)}</span>
+            </div>
+            <div className="flex justify-between pl-3">
+              <span className="text-gray-400 text-xs">Despesas</span>
+              <span className="text-red-400 text-xs">-{formatBRL(totalSaidas)}</span>
+            </div>
+            <div className="flex justify-between pl-3">
+              <span className="text-gray-400 text-xs">Transferências</span>
+              <span className="text-gray-400 text-xs">0,00</span>
+            </div>
+            <div className="flex justify-between mt-3 pt-3 border-t font-bold">
+              <span className="text-gray-700">Resultado</span>
+              <span className={resultado >= 0 ? 'text-emerald-600' : 'text-red-500'}>
+                {resultado < 0 ? '-' : ''}{formatBRL(resultado)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabela */}
+      <div className="flex-1 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+
+        {/* Filtros + botão excluir selecionados */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-gray-600 mr-1">Filtrar</span>
+            {(['pending', 'confirmed', 'all'] as FilterType[]).map(f => (
+              <button
+                key={f}
+                onClick={() => { setFilter(f); setSelected(new Set()); }}
+                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-all ${
+                  filter === f
+                    ? f === 'pending'   ? 'bg-red-100 text-red-600'
+                    : f === 'confirmed' ? 'bg-blue-100 text-blue-600'
+                    : 'bg-gray-200 text-gray-700'
+                    : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                {f === 'pending'   && <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />}
+                {f === 'confirmed' && <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />}
+                {f === 'pending' ? 'Pendentes' : f === 'confirmed' ? 'Confirmados' : 'Todos'}
+              </button>
+            ))}
+          </div>
+
+          {someSelected && (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-all shadow-sm"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Excluir {selected.size} {selected.size === 1 ? 'item' : 'itens'}
+            </button>
+          )}
+        </div>
+
+        {/* Saldo anterior */}
+        <div className="flex items-center px-5 py-2.5 border-b border-gray-50 bg-gray-50/50">
+          <div className="w-7 mr-3" />
+          <div className="w-20 text-xs text-gray-400">31/01</div>
+          <div className="flex-1 text-xs text-gray-500 font-medium">Saldo anterior</div>
+          <div className="text-xs text-gray-500 pr-10">0,00</div>
+        </div>
+
+        {/* Cabeçalho */}
+        <div className="flex items-center px-5 py-2 bg-gray-50 border-b border-gray-100">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={toggleAll}
+            className="w-4 h-4 rounded accent-emerald-500 cursor-pointer mr-3 flex-shrink-0"
+            title="Selecionar todos"
+          />
+          <div className="w-4 mr-2" />
+          <div className="w-20 text-xs font-semibold text-gray-400">Data</div>
+          <div className="flex-1 text-xs font-semibold text-gray-400">Descrição</div>
+          <div className="w-8" />
+          <div className="w-24 text-right text-xs font-semibold text-gray-400">Valor</div>
+          <div className="w-10" />
+          <div className="w-28 text-right text-xs font-semibold text-gray-400 pr-8">Saldo</div>
+        </div>
+
+        {/* Linhas */}
+        <div className="divide-y divide-gray-50">
+          {rows.length === 0 && (
+            <div className="text-center py-12 text-gray-400 text-sm">
+              Nenhuma transação encontrada
+            </div>
+          )}
+          {rows.map((t) => {
+            const isSelected = selected.has(t.id);
+            return (
+              <div
+                key={t.id}
+                onClick={() => toggleOne(t.id)}
+                className={`flex items-center px-5 py-3 cursor-pointer transition-colors select-none ${
+                  isSelected ? 'bg-emerald-50 border-l-2 border-emerald-400' : 'hover:bg-gray-50/70'
+                }`}
+              >
+                {/* Checkbox */}
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleOne(t.id)}
+                  onClick={e => e.stopPropagation()}
+                  className="w-4 h-4 rounded accent-emerald-500 cursor-pointer mr-3 flex-shrink-0"
+                />
+
+                {/* Status dot */}
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 mr-2 ${STATUS_COLORS[t.status] ?? 'bg-gray-300'}`} />
+
+                {/* Data */}
+                <div className="w-20 text-xs text-gray-500 flex-shrink-0">{t.date}</div>
+
+                {/* Descrição + badges */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{t.desc}</p>
+                  <div className="flex gap-1.5 mt-0.5 flex-wrap">
+                    <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-medium">{t.account}</span>
+                    <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-medium">{t.cat}</span>
+                  </div>
+                </div>
+
+                {/* Check status */}
+                <div className="w-8 flex justify-center">
+                  {t.status === 'confirmed'
+                    ? <CheckCheck className="w-3.5 h-3.5 text-gray-300" />
+                    : <Check className="w-3.5 h-3.5 text-gray-200" />}
+                </div>
+
+                {/* Valor */}
+                <div className={`w-24 text-right text-sm font-semibold ${t.value >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {t.value < 0 ? '-' : ''}{formatBRL(t.value)}
+                </div>
+
+                {/* Menu 3 pontinhos */}
+                <div className="w-10 flex justify-center">
+                  <RowMenu
+                    onEdit={() => openEdit(t)}
+                    onDelete={() => { setSelected(new Set([t.id])); setConfirmDelete(true); }}
+                  />
+                </div>
+
+                {/* Saldo acumulado */}
+                <div className={`w-28 text-right text-sm font-semibold ${t.saldoAcumulado >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {t.saldoAcumulado < 0 ? '-' : ''}{formatBRL(t.saldoAcumulado)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Modal de Edição ── */}
+      {editingTx && editForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setEditingTx(null)} />
+          <div className="bg-white rounded-2xl shadow-2xl p-6 z-10 w-full max-w-md">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-base font-bold text-gray-800">Editar lançamento</h3>
+              <button onClick={() => setEditingTx(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Data</label>
+                <input
+                  type="date"
+                  value={editForm.date}
+                  onChange={e => setEditForm({ ...editForm, date: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Descrição</label>
+                <input
+                  type="text"
+                  value={editForm.desc}
+                  onChange={e => setEditForm({ ...editForm, desc: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Categoria</label>
+                  <input
+                    type="text"
+                    value={editForm.cat}
+                    onChange={e => setEditForm({ ...editForm, cat: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Conta</label>
+                  <input
+                    type="text"
+                    value={editForm.account}
+                    onChange={e => setEditForm({ ...editForm, account: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
+                  <select
+                    value={editForm.type}
+                    onChange={e => setEditForm({ ...editForm, type: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  >
+                    <option value="expense">Despesa</option>
+                    <option value="income">Receita</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                  <select
+                    value={editForm.status}
+                    onChange={e => setEditForm({ ...editForm, status: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  >
+                    <option value="confirmed">Confirmado</option>
+                    <option value="pending">Pendente</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Valor (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editForm.value}
+                  onChange={e => setEditForm({ ...editForm, value: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => setEditingTx(null)}
+                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveEdit}
+                className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal confirmação exclusão ── */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setConfirmDelete(false)} />
+          <div className="bg-white rounded-xl shadow-xl p-6 z-10 w-80">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-800">
+                  Excluir {selected.size} {selected.size === 1 ? 'transação' : 'transações'}?
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">Essa ação não pode ser desfeita.</p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => { setConfirmDelete(false); setSelected(new Set()); }}
+                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteSelected}
+                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
