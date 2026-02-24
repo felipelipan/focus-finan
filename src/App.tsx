@@ -14,6 +14,7 @@ import {
   TrendingDown,
   TrendingUp,
   BookOpen,
+  Menu,
 } from 'lucide-react';
 import {
   XAxis,
@@ -527,12 +528,17 @@ function AppContent(): JSX.Element {
 
   return (
     <div className="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden">
-      {/* Sidebar */}
+
+      {/* ── SIDEBAR — desktop only ── */}
       <aside
-        className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-gray-200 transition-all duration-300 flex flex-col z-20`}
+        className={`
+          hidden md:flex flex-col
+          ${isSidebarOpen ? 'w-64' : 'w-20'}
+          bg-white border-r border-gray-200 transition-all duration-300 z-20 shrink-0
+        `}
       >
         <div className="p-6 flex items-center">
-          <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold mr-3 shadow-sm">
+          <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold mr-3 shadow-sm flex-shrink-0">
             F
           </div>
           {isSidebarOpen && (
@@ -568,45 +574,103 @@ function AppContent(): JSX.Element {
         </nav>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden relative">
+      {/* ── MAIN CONTENT ── */}
+      <main className="flex-1 flex flex-col overflow-hidden relative min-w-0">
+
         {/* Header */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 z-10 shrink-0">
-          <div className="flex items-center space-x-4">
-            <h2 className="text-lg font-medium text-gray-700">
+        <header className="h-14 md:h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-8 z-10 shrink-0">
+          <div className="flex items-center gap-3">
+            {/* Hamburger — mobile only */}
+            <button
+              className="md:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100"
+              onClick={() => setIsSidebarOpen(o => !o)}
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            {/* Collapse toggle — desktop only */}
+            <button
+              className="hidden md:flex p-2 rounded-lg text-gray-400 hover:bg-gray-100"
+              onClick={() => setIsSidebarOpen(o => !o)}
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <h2 className="text-base md:text-lg font-semibold text-gray-700">
               {currentView === 'visao-geral' ? 'Visão Geral'
-                : currentView === 'lancamentos' ? 'Lançamentos de Caixa'
+                : currentView === 'lancamentos' ? 'Lançamentos'
                 : 'Plano de Contas'}
             </h2>
           </div>
-          <div className="flex items-center space-x-6">
-            <div className="flex items-center space-x-4">
-              <Search className="w-5 h-5 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
-              <Bell className="w-5 h-5 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" />
-            </div>
-            <div className="flex items-center bg-emerald-500 text-white px-3 py-1.5 rounded-full cursor-pointer hover:bg-emerald-600 transition-colors shadow-sm">
-              <span className="text-sm font-medium mr-2 uppercase tracking-wide">Felipe Oliveira</span>
+          <div className="flex items-center gap-3 md:gap-6">
+            <Search className="w-5 h-5 text-gray-400 cursor-pointer hover:text-gray-600 hidden sm:block" />
+            <Bell className="w-5 h-5 text-gray-400 cursor-pointer hover:text-gray-600" />
+            <div className="flex items-center bg-emerald-500 text-white px-2 md:px-3 py-1.5 rounded-full cursor-pointer hover:bg-emerald-600 shadow-sm">
+              <span className="text-xs md:text-sm font-medium mr-1 md:mr-2 uppercase tracking-wide hidden sm:block">Felipe Oliveira</span>
+              <span className="text-xs font-bold sm:hidden">FO</span>
               <ChevronDown className="w-4 h-4" />
             </div>
           </div>
         </header>
 
-        {/* Scrollable View Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Mobile drawer overlay */}
+        {isSidebarOpen && (
+          <div
+            className="md:hidden fixed inset-0 z-30 bg-black/40"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        {/* Mobile drawer */}
+        <div className={`
+          md:hidden fixed top-0 left-0 h-full z-40 bg-white shadow-2xl transition-transform duration-300
+          w-64 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}>
+          <div className="p-5 flex items-center justify-between border-b">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold shadow-sm">F</div>
+              <span className="font-bold text-lg text-gray-800">Focus Finan</span>
+            </div>
+            <button onClick={() => setIsSidebarOpen(false)} className="text-gray-400 hover:text-gray-600">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <nav className="py-4">
+            {[
+              { icon: LayoutDashboard, label: 'Visão geral',      view: 'visao-geral'  as ViewType },
+              { icon: ArrowLeftRight,  label: 'Lançamentos',      view: 'lancamentos'  as ViewType },
+              { icon: BookOpen,        label: 'Plano de Contas',  view: 'plano-contas' as ViewType },
+            ].map(({ icon: Icon, label, view }) => (
+              <button
+                key={view}
+                onClick={() => { setCurrentView(view); setIsSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-5 py-3 text-sm font-medium transition-colors ${
+                  currentView === view
+                    ? 'bg-emerald-50 text-emerald-600 border-r-2 border-emerald-500'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                {label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-4 md:space-y-6 pb-24 md:pb-6">
           {/* Error Display */}
           {financeData.error && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex justify-between items-start">
-              <p className="text-red-700">{financeData.error}</p>
-              <button onClick={financeData.clearError} className="text-red-500 hover:text-red-700">
+              <p className="text-red-700 text-sm">{financeData.error}</p>
+              <button onClick={financeData.clearError} className="text-red-500 hover:text-red-700 ml-2">
                 <X className="w-4 h-4" />
               </button>
             </div>
           )}
 
           {currentView === 'visao-geral' ? (
-            <div className="grid grid-cols-12 gap-6 pb-20">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 pb-20">
               {/* Fluxo de caixa */}
-              <Card title="Fluxo de caixa" className="col-span-12">
+              <Card title="Fluxo de caixa" className="col-span-1 md:col-span-12">
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={flowChartData} margin={{ left: 10, right: 20 }}>
@@ -686,7 +750,7 @@ function AppContent(): JSX.Element {
               </Card>
 
               {/* Despesas por categoria */}
-              <Card className="col-span-12">
+              <Card className="col-span-1 md:col-span-6">
                 <p className="text-sm font-semibold text-gray-700 mb-0.5">Despesas por categoria</p>
                 <p className="text-xs text-gray-400 mb-4">Situação projetada</p>
 
@@ -740,8 +804,8 @@ function AppContent(): JSX.Element {
                 </div>
               </Card>
 
-            {/* Receitas por categoria */}
-              <Card className="col-span-12">
+              {/* Receitas por categoria */}
+              <Card className="col-span-1 md:col-span-6">
                 <p className="text-sm font-semibold text-gray-700 mb-0.5">Receitas por categoria</p>
                 <p className="text-xs text-gray-400 mb-4">Situação projetada</p>
 
@@ -793,7 +857,7 @@ function AppContent(): JSX.Element {
               </Card>
 
               {/* Contas a pagar e a receber lado a lado */}
-              <div className="col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="col-span-1 md:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6">
 
                 {/* Contas a pagar */}
                 <Card className="col-span-1">
@@ -964,13 +1028,33 @@ function AppContent(): JSX.Element {
           )}
         </div>
 
-        {/* FAB */}
+        {/* FAB — acima da bottom nav no mobile */}
         <button
           onClick={() => setIsNewOpen(true)}
-          className="fixed bottom-8 right-8 w-14 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 z-50"
+          className="fixed bottom-20 right-5 md:bottom-8 md:right-8 w-12 h-12 md:w-14 md:h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 z-50"
         >
-          <Plus className="w-8 h-8" />
+          <Plus className="w-6 h-6 md:w-8 md:h-8" />
         </button>
+
+        {/* Bottom nav — mobile only */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 flex items-center justify-around px-2 h-16 shadow-lg">
+          {[
+            { icon: LayoutDashboard, label: 'Dashboard', view: 'visao-geral'  as ViewType },
+            { icon: ArrowLeftRight,  label: 'Lançamentos', view: 'lancamentos'  as ViewType },
+            { icon: BookOpen,        label: 'Categorias',  view: 'plano-contas' as ViewType },
+          ].map(({ icon: Icon, label, view }) => (
+            <button
+              key={view}
+              onClick={() => setCurrentView(view)}
+              className={`flex flex-col items-center gap-1 flex-1 py-2 transition-colors ${
+                currentView === view ? 'text-emerald-600' : 'text-gray-400'
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              <span className="text-[10px] font-medium">{label}</span>
+            </button>
+          ))}
+        </nav>
 
         {/* Modal nova transação */}
         {isNewOpen && (
