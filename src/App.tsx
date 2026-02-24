@@ -284,9 +284,40 @@ function AppContent(): JSX.Element {
   const [dashboardData, setDashboardData] = useState<any>(null);
 
   // Transações locais — funcionam mesmo sem backend
-  const [localTransactions, setLocalTransactions] = useState<Transaction[]>(initialTransactions);
-  const [nextId, setNextId] = useState(initialTransactions.length + 1);
-  const [categorias, setCategorias] = useState<Categoria[]>(initialCategorias);
+  // Carrega do localStorage, usa initialTransactions como fallback na primeira vez
+const [localTransactions, setLocalTransactions] = useState<Transaction[]>(() => {
+  try {
+    const saved = localStorage.getItem('focusfinan:transactions');
+    return saved ? JSON.parse(saved) : initialTransactions;
+  } catch { return initialTransactions; }
+});
+
+const [nextId, setNextId] = useState<number>(() => {
+  try {
+    const saved = localStorage.getItem('focusfinan:nextId');
+    return saved ? Number(saved) : initialTransactions.length + 1;
+  } catch { return initialTransactions.length + 1; }
+});
+
+const [categorias, setCategorias] = useState<Categoria[]>(() => {
+  try {
+    const saved = localStorage.getItem('focusfinan:categorias');
+    return saved ? JSON.parse(saved) : initialCategorias;
+  } catch { return initialCategorias; }
+});
+
+// Salva automaticamente no localStorage sempre que mudar
+useEffect(() => {
+  localStorage.setItem('focusfinan:transactions', JSON.stringify(localTransactions));
+}, [localTransactions]);
+
+useEffect(() => {
+  localStorage.setItem('focusfinan:nextId', String(nextId));
+}, [nextId]);
+
+useEffect(() => {
+  localStorage.setItem('focusfinan:categorias', JSON.stringify(categorias));
+}, [categorias]);
 
   const API_BASE = import.meta.env.VITE_API_URL ?? '';
   const financeData = useFinanceData(localTransactions, API_BASE);
