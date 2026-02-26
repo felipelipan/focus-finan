@@ -119,7 +119,7 @@ function ContaModal({ initial, onSave, onClose }: {
             <label className="block text-xs font-medium text-gray-500 mb-1">
               Saldo em {dataBR} ({moeda === 'BRL' ? 'R$' : moeda === 'USD' ? 'US$' : '€'})
             </label>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <input type="number" step="0.01" min="0" value={saldo} onChange={e => setSaldo(e.target.value)}
                 className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
               <div className="flex gap-3">
