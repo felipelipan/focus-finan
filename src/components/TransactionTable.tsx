@@ -1,11 +1,14 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Check, CheckCheck, Trash2, MoreVertical, Pencil } from 'lucide-react';
-import { Transaction } from '../types';
+import { Transaction, Conta } from '../types';
 import { Categoria } from './PlanoContas';
 
 interface Props {
   transactions: Transaction[];
   categorias: Categoria[];
+  contas: Conta[];
+  saldoAnterior: number;
+  labelMesAnterior: string;
   onDelete: (id: number) => void;
   onEdit: (updated: Transaction) => void;
 }
@@ -38,32 +41,43 @@ function isoToBr(iso: string): string {
   return `${d}/${m}/${String(y).slice(-2)}`;
 }
 
-// Menu dropdown por linha
+// Menu dropdown por linha — usa position fixed para escapar de overflow-hidden
 function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
+    if (!pos) return;
+    const handler = (e: MouseEvent) => setPos(null);
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  }, [pos]);
+
+  const handleOpen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (pos) { setPos(null); return; }
+    const rect = btnRef.current!.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+  };
 
   return (
-    <div ref={ref} className="relative" onClick={e => e.stopPropagation()}>
+    <div onClick={e => e.stopPropagation()}>
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={btnRef}
+        onClick={handleOpen}
         className="p-1.5 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-all"
       >
         <MoreVertical className="w-4 h-4" />
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg z-30 w-40 py-1 overflow-hidden">
+      {pos && (
+        <div
+          style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999 }}
+          className="bg-white border border-gray-200 rounded-xl shadow-xl w-40 py-1"
+          onMouseDown={e => e.stopPropagation()}
+        >
           <button
-            onClick={() => { onEdit(); setOpen(false); }}
+            onClick={() => { onEdit(); setPos(null); }}
             className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
           >
             <Pencil className="w-3.5 h-3.5 text-gray-400" />
@@ -71,7 +85,7 @@ function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => voi
           </button>
           <div className="border-t border-gray-100 mx-2" />
           <button
-            onClick={() => { onDelete(); setOpen(false); }}
+            onClick={() => { onDelete(); setPos(null); }}
             className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -83,7 +97,7 @@ function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => voi
   );
 }
 
-export function TransactionTable({ transactions, categorias, onDelete, onEdit }: Props) {
+export function TransactionTable({ transactions, categorias, contas, saldoAnterior, labelMesAnterior, onDelete, onEdit }: Props) {
   const [filter, setFilter]               = useState<FilterType>('all');
   const [selected, setSelected]           = useState<Set<number>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -114,14 +128,14 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
     });
   }, [filtered]);
 
-  // Saldo acumulado — só confirmadas atualizam o saldo; pendentes mostram traço
+  // Saldo acumulado — parte do saldo anterior; só confirmadas atualizam o saldo
   const rows = useMemo(() => {
-    let saldo = 0;
+    let saldo = saldoAnterior;
     return sorted.map(t => {
       if (t.status === 'confirmed') saldo += Number(t.value);
       return { ...t, saldoAcumulado: t.status === 'confirmed' ? saldo : null };
     });
-  }, [sorted]);
+  }, [sorted, saldoAnterior]);
 
   // Totais — só confirmadas
   const totalEntradas = transactions.filter(t => t.value > 0 && t.status === 'confirmed').reduce((a, t) => a + t.value, 0);
@@ -280,9 +294,12 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
         {/* Saldo anterior */}
         <div className="flex items-center px-5 py-2.5 border-b border-gray-50 bg-gray-50/50">
           <div className="w-7 mr-3" />
-          <div className="w-20 text-xs text-gray-400">31/01</div>
+          <div className="w-16 sm:w-20 text-xs text-gray-400">{labelMesAnterior}</div>
           <div className="flex-1 text-xs text-gray-500 font-medium">Saldo anterior</div>
-          <div className="text-xs text-gray-500 pr-10">0,00</div>
+          <div className="w-10" />
+          <div className={`hidden sm:block w-28 text-right text-xs font-semibold pr-8 ${saldoAnterior < 0 ? 'text-red-500' : 'text-gray-500'}`}>
+            {saldoAnterior < 0 ? '-' : ''}{Math.abs(saldoAnterior).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </div>
         </div>
 
         {/* Cabeçalho */}
@@ -390,120 +407,119 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
               <button onClick={() => setEditingTx(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
             </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Data</label>
-                <input
-                  type="date"
-                  value={editForm.date}
-                  onChange={e => setEditForm({ ...editForm, date: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Descrição</label>
-                <input
-                  type="text"
-                  value={editForm.desc}
-                  onChange={e => setEditForm({ ...editForm, desc: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Categoria</label>
-                  {(() => {
-                    const catsDoTipo = categorias.filter(c =>
-                      editForm.type === 'expense' ? c.tipo === 'despesa' : c.tipo === 'receita'
-                    );
-                    const opcoes = catsDoTipo.flatMap(c => [
-                      { label: c.nome, value: c.nome, cor: c.cor },
-                      ...c.subcategorias.map(s => ({ label: '  ↳ ' + s.nome, value: s.nome, cor: s.cor })),
-                    ]);
-                    const corAtual = opcoes.find(o => o.value === editForm.cat)?.cor;
-                    return (
-                      <div className="relative flex items-center">
-                        {corAtual && (
-                          <span className="absolute left-3 w-3 h-3 rounded-full pointer-events-none z-10"
-                            style={{ backgroundColor: corAtual }} />
-                        )}
-                        <select
-                          value={editForm.cat}
-                          onChange={e => setEditForm({ ...editForm, cat: e.target.value })}
-                          className={"w-full border border-gray-200 rounded-lg py-2 pr-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 " + (corAtual ? 'pl-8' : 'pl-3')}
-                        >
-                          {!opcoes.find(o => o.value === editForm.cat) && (
-                            <option value={editForm.cat}>{editForm.cat}</option>
-                          )}
-                          {opcoes.map(op => (
-                            <option key={op.value} value={op.value}>{op.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    );
-                  })()}
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Conta</label>
-                  <input
-                    type="text"
-                    value={editForm.account}
-                    onChange={e => setEditForm({ ...editForm, account: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
-                  <select
-                    value={editForm.type}
-                    onChange={e => setEditForm({ ...editForm, type: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  >
-                    <option value="expense">Despesa</option>
-                    <option value="income">Receita</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
-                  <select
-                    value={editForm.status}
-                    onChange={e => setEditForm({ ...editForm, status: e.target.value })}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  >
-                    <option value="confirmed">Confirmado</option>
-                    <option value="pending">Pendente</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Valor (R$)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={editForm.value}
-                  onChange={e => setEditForm({ ...editForm, value: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                />
-              </div>
-            </div>
+            {(() => {
+              const INPUT = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400";
+              const catsDoTipo = categorias.filter(c =>
+                editForm.type === 'expense' ? c.tipo === 'despesa' : c.tipo === 'receita'
+              );
+              const opcoes = catsDoTipo.flatMap(c => [
+                { label: c.nome, value: c.nome, cor: c.cor },
+                ...c.subcategorias.map(s => ({ label: '  ↳ ' + s.nome, value: s.nome, cor: s.cor })),
+              ]);
+              const corAtual = opcoes.find(o => o.value === editForm.cat)?.cor;
 
-            <div className="flex gap-2 mt-5">
-              <button
-                onClick={() => setEditingTx(null)}
-                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={saveEdit}
-                className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                Salvar
-              </button>
-            </div>
+              return (
+                <div className="space-y-3">
+                  {/* Data + Status */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Data</label>
+                      <input type="date" value={editForm.date}
+                        onChange={e => setEditForm({ ...editForm, date: e.target.value })}
+                        className={INPUT} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+                      <select value={editForm.status}
+                        onChange={e => setEditForm({ ...editForm, status: e.target.value })}
+                        className={INPUT}>
+                        <option value="confirmed">Confirmado</option>
+                        <option value="pending">Pendente</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Descrição */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Descrição</label>
+                    <input type="text" value={editForm.desc}
+                      onChange={e => setEditForm({ ...editForm, desc: e.target.value })}
+                      className={INPUT} />
+                  </div>
+
+                  {/* Tipo + Valor */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
+                      <select value={editForm.type}
+                        onChange={e => setEditForm({ ...editForm, type: e.target.value })}
+                        className={INPUT}>
+                        <option value="expense">Despesa</option>
+                        <option value="income">Receita</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Valor (R$)</label>
+                      <input type="number" step="0.01" min="0" value={editForm.value}
+                        onChange={e => setEditForm({ ...editForm, value: e.target.value })}
+                        className={INPUT} />
+                    </div>
+                  </div>
+
+                  {/* Categoria */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Categoria</label>
+                    <div className="relative flex items-center">
+                      {corAtual && (
+                        <span className="absolute left-3 w-3 h-3 rounded-full pointer-events-none z-10"
+                          style={{ backgroundColor: corAtual }} />
+                      )}
+                      <select value={editForm.cat}
+                        onChange={e => setEditForm({ ...editForm, cat: e.target.value })}
+                        className={INPUT + (corAtual ? ' pl-8' : '')}>
+                        {!opcoes.find(o => o.value === editForm.cat) && (
+                          <option value={editForm.cat}>{editForm.cat}</option>
+                        )}
+                        {opcoes.map(op => (
+                          <option key={op.value} value={op.value}>{op.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Conta */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Conta</label>
+                    {contas.length > 0 ? (
+                      <select value={editForm.account}
+                        onChange={e => setEditForm({ ...editForm, account: e.target.value })}
+                        className={INPUT}>
+                        {contas.map(c => <option key={c.nome} value={c.nome}>{c.nome}</option>)}
+                        {!contas.find(c => c.nome === editForm.account) && editForm.account && (
+                          <option value={editForm.account}>{editForm.account}</option>
+                        )}
+                      </select>
+                    ) : (
+                      <input type="text" value={editForm.account}
+                        onChange={e => setEditForm({ ...editForm, account: e.target.value })}
+                        className={INPUT} />
+                    )}
+                  </div>
+
+                  {/* Botões */}
+                  <div className="flex gap-2 pt-2">
+                    <button onClick={() => setEditingTx(null)}
+                      className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
+                      Cancelar
+                    </button>
+                    <button onClick={saveEdit}
+                      className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors">
+                      Salvar
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

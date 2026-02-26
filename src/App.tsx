@@ -184,72 +184,95 @@ function getCategorySummary(
 }
 
 // ---------------------------------------------------------------------------
-// Formulário de nova transação
+// Formulário de nova transação (compartilhado com edição)
 // ---------------------------------------------------------------------------
 
-interface NewTransactionFormProps {
+interface TxFormProps {
   onCancel: () => void;
-  onCreate: (data: any) => Promise<void>;
+  onSave: (data: any) => void;
   categorias: Categoria[];
+  contas: { nome: string }[];
+  initial?: {
+    date: string; desc: string; cat: string; type: string;
+    value: string; account: string; status: string;
+  };
+  submitLabel?: string;
 }
 
-function NewTransactionForm({ onCancel, onCreate, categorias }: NewTransactionFormProps): JSX.Element {
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
-    desc: '',
-    cat: '',
-    type: 'expense',
-    value: '',
-    account: 'Conta corrente',
-    status: 'confirmed',
+function TxForm({ onCancel, onSave, categorias, contas, initial, submitLabel = 'Salvar' }: TxFormProps): JSX.Element {
+  const hoje = new Date().toISOString().split('T')[0];
+  const [form, setForm] = useState({
+    date:    initial?.date    ?? hoje,
+    desc:    initial?.desc    ?? '',
+    cat:     initial?.cat     ?? '',
+    type:    initial?.type    ?? 'expense',
+    value:   initial?.value   ?? '',
+    account: initial?.account ?? (contas[0]?.nome ?? ''),
+    status:  initial?.status  ?? 'confirmed',
   });
 
+  const set = (field: string, val: string) => setForm(f => ({ ...f, [field]: val }));
+
   const catsDoTipo = categorias.filter(c =>
-    formData.type === 'expense' ? c.tipo === 'despesa' : c.tipo === 'receita'
+    form.type === 'expense' ? c.tipo === 'despesa' : c.tipo === 'receita'
   );
   const opcoesCategoria = catsDoTipo.flatMap(c => [
     { label: c.nome, value: c.nome, cor: c.cor },
     ...c.subcategorias.map(s => ({ label: '  ↳ ' + s.nome, value: s.nome, cor: s.cor })),
   ]);
-  const corSelecionada = opcoesCategoria.find(o => o.value === formData.cat)?.cor;
+  const corSelecionada = opcoesCategoria.find(o => o.value === form.cat)?.cor;
+
+  const INPUT = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400";
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onCreate(formData); }} className="space-y-4">
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Data</label>
-        <input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Descrição</label>
-        <input type="text" value={formData.desc} onChange={(e) => setFormData({ ...formData, desc: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-      </div>
+    <div className="space-y-3">
+      {/* Data + Descrição */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
-          <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value, cat: '' })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400">
-            <option value="expense">Despesa</option>
-            <option value="income">Receita</option>
-          </select>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Data</label>
+          <input type="date" value={form.date} onChange={e => set('date', e.target.value)} className={INPUT} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
-          <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+          <select value={form.status} onChange={e => set('status', e.target.value)} className={INPUT}>
             <option value="confirmed">Confirmado</option>
             <option value="pending">Pendente</option>
           </select>
         </div>
       </div>
+
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Categoria</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Descrição</label>
+        <input type="text" value={form.desc} onChange={e => set('desc', e.target.value)}
+          placeholder="Ex: Mercado, Salário..." className={INPUT} />
+      </div>
+
+      {/* Tipo + Valor */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
+          <select value={form.type} onChange={e => set('type', e.target.value)} className={INPUT}>
+            <option value="expense">Despesa</option>
+            <option value="income">Receita</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Valor (R$)</label>
+          <input type="number" step="0.01" min="0" placeholder="0,00"
+            value={form.value} onChange={e => set('value', e.target.value)} className={INPUT} />
+        </div>
+      </div>
+
+      {/* Categoria */}
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Categoria</label>
         <div className="relative flex items-center">
           {corSelecionada && (
-            <span className="absolute left-3 w-3 h-3 rounded-full pointer-events-none z-10" style={{ backgroundColor: corSelecionada }} />
+            <span className="absolute left-3 w-3 h-3 rounded-full pointer-events-none z-10"
+              style={{ backgroundColor: corSelecionada }} />
           )}
-          <select
-            value={formData.cat}
-            onChange={(e) => setFormData({ ...formData, cat: e.target.value })}
-            className={"w-full border border-gray-200 rounded-lg py-2 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 " + (corSelecionada ? "pl-8" : "pl-3")}
-          >
+          <select value={form.cat} onChange={e => set('cat', e.target.value)}
+            className={INPUT + (corSelecionada ? ' pl-8' : '')}>
             <option value="">Selecione uma categoria</option>
             {opcoesCategoria.map(op => (
               <option key={op.value} value={op.value}>{op.label}</option>
@@ -257,21 +280,36 @@ function NewTransactionForm({ onCancel, onCreate, categorias }: NewTransactionFo
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Conta</label>
-          <input type="text" value={formData.account} onChange={(e) => setFormData({ ...formData, account: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Valor (R$)</label>
-          <input type="number" step="0.01" min="0" placeholder="0,00" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-        </div>
+
+      {/* Conta */}
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Conta</label>
+        {contas.length > 0 ? (
+          <select value={form.account} onChange={e => set('account', e.target.value)} className={INPUT}>
+            {contas.map(c => <option key={c.nome} value={c.nome}>{c.nome}</option>)}
+            {/* fallback: se a conta atual não está nas cadastradas */}
+            {!contas.find(c => c.nome === form.account) && form.account && (
+              <option value={form.account}>{form.account}</option>
+            )}
+          </select>
+        ) : (
+          <input type="text" value={form.account} onChange={e => set('account', e.target.value)}
+            placeholder="Ex: Conta corrente" className={INPUT} />
+        )}
       </div>
+
+      {/* Botões */}
       <div className="flex gap-2 pt-2">
-        <button type="button" onClick={onCancel} className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">Cancelar</button>
-        <button type="submit" className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600">Criar</button>
+        <button type="button" onClick={onCancel}
+          className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
+          Cancelar
+        </button>
+        <button type="button" onClick={() => onSave(form)}
+          className="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600">
+          {submitLabel}
+        </button>
       </div>
-    </form>
+    </div>
   );
 }
 
@@ -330,6 +368,11 @@ function AppContent(): JSX.Element {
   const nomeMes = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
     .format(new Date(mesSel.ano, mesSel.mes, 1))
     .replace(/^\w/, c => c.toUpperCase());
+
+  // Toggle de exibição dos gráficos: true = só confirmados, false = todos
+  const [fluxoSoConfirmados,    setFluxoSoConfirmados]    = useState(true);
+  const [despesasSoConfirmados, setDespesasSoConfirmados] = useState(true);
+  const [receitasSoConfirmados, setReceitasSoConfirmados] = useState(true);
 
   // Salva automaticamente no localStorage sempre que mudar
   useEffect(() => {
@@ -401,18 +444,29 @@ function AppContent(): JSX.Element {
   // Gráfico de fluxo: só confirmadas do mês
   const flowChartData = useMemo(() => groupByDate(txConfirmadas), [txConfirmadas]);
 
-  // Saldo por conta = saldo inicial cadastrado + todas as confirmadas (histórico completo)
+  // Saldo por conta = saldo inicial cadastrado + confirmadas APÓS a data de saldo inicial
   const saldoPorConta = useMemo(() => {
     const confirmadosTodos = localTransactions.filter(t => t.status === 'confirmed');
     const map = new Map<string, number>();
-    // Parte do saldo inicial das contas cadastradas
+    // Saldo inicial de cada conta cadastrada
+    const contaDataInicial = new Map<string, number>();
     contas.forEach(c => {
       const si = c.saldoInicialTipo === 'credor' ? c.saldoInicial : -c.saldoInicial;
       map.set(c.nome, si);
+      // data de corte: só conta transações após essa data
+      const p = c.saldoInicialData.split('/');
+      if (p.length === 3) {
+        let y = Number(p[2]); if (y < 100) y += 2000;
+        contaDataInicial.set(c.nome, new Date(y, Number(p[1]) - 1, Number(p[0])).getTime());
+      }
     });
-    // Soma confirmadas
+    // Soma confirmadas (se houver data de corte, só após ela; senão soma tudo)
     confirmadosTodos.forEach(t => {
-      map.set(t.account, (map.get(t.account) ?? 0) + Number(t.value));
+      const corte = contaDataInicial.get(t.account);
+      const dtTx  = parseDate(t.date).getTime();
+      if (corte === undefined || dtTx > corte) {
+        map.set(t.account, (map.get(t.account) ?? 0) + Number(t.value));
+      }
     });
     return Array.from(map.entries()).map(([conta, saldo]) => ({ conta, saldo }));
   }, [localTransactions, contas]);
@@ -436,6 +490,27 @@ function AppContent(): JSX.Element {
     () => saldoProjetadoPorConta.reduce((a, c) => a + c.saldoProjetado, 0),
     [saldoProjetadoPorConta]
   );
+
+  // Saldo anterior = saldo inicial das contas + confirmadas ANTES do mês selecionado
+  const saldoAnterior = useMemo(() => {
+    const confirmadosAnteriores = localTransactions.filter(t => {
+      if (t.status !== 'confirmed') return false;
+      const dt = parseDate(t.date);
+      return dt.getFullYear() < mesSel.ano ||
+        (dt.getFullYear() === mesSel.ano && dt.getMonth() < mesSel.mes);
+    });
+    let saldo = contas.reduce((a, c) =>
+      a + (c.saldoInicialTipo === 'credor' ? c.saldoInicial : -c.saldoInicial), 0
+    );
+    confirmadosAnteriores.forEach(t => { saldo += Number(t.value); });
+    return saldo;
+  }, [localTransactions, contas, mesSel]);
+
+  // Último dia do mês anterior para exibir no label
+  const labelMesAnterior = useMemo(() => {
+    const d = new Date(mesSel.ano, mesSel.mes, 0); // dia 0 = último dia do mês anterior
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  }, [mesSel]);
 
   // Categorias — confirmadas do mês (realizadas)
   const expenseCategories = useMemo(
@@ -895,11 +970,28 @@ function AppContent(): JSX.Element {
                 </div>
               </Card>
 
-              {/* Fluxo de caixa — só confirmados do mês */}
-              <Card title="Fluxo de caixa (confirmado)" className="col-span-1 md:col-span-12">
+              {/* Fluxo de caixa */}
+              <Card className="col-span-1 md:col-span-12">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-semibold text-gray-700">Fluxo de caixa</p>
+                  <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+                    <button
+                      onClick={() => setFluxoSoConfirmados(true)}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${fluxoSoConfirmados ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      Confirmado
+                    </button>
+                    <button
+                      onClick={() => setFluxoSoConfirmados(false)}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${!fluxoSoConfirmados ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      Todos
+                    </button>
+                  </div>
+                </div>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={flowChartData} margin={{ left: 10, right: 20 }}>
+                    <LineChart data={fluxoSoConfirmados ? flowChartData : groupByDate(txDoMes)} margin={{ left: 10, right: 20 }}>
                       <CartesianGrid strokeDasharray="" vertical={false} stroke="#eeeeee" />
                       <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} stroke="#aaaaaa" />
                       <YAxis fontSize={11} tickLine={false} axisLine={false} stroke="#aaaaaa"
@@ -919,86 +1011,124 @@ function AppContent(): JSX.Element {
 
               {/* Despesas por categoria */}
               <Card className="col-span-1 md:col-span-6">
-                <p className="text-sm font-semibold text-gray-700 mb-0.5">Despesas por categoria</p>
-                <div className="flex gap-3 mb-4">
-                  <span className="text-xs text-emerald-600 font-semibold border-b-2 border-emerald-500 pb-0.5">Confirmado</span>
-                  <span className="text-xs text-gray-400">Projetado: -{formatBRL(totalExpensesProj)}</span>
-                </div>
-
-                <div className="flex justify-center mb-6">
-                  <div className="w-full max-w-[224px] h-52 mx-auto">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RePieChart>
-                        <Pie data={expenseCategories} innerRadius={70} outerRadius={105} paddingAngle={2}
-                          dataKey="value" startAngle={90} endAngle={-270}>
-                          {expenseCategories.map((entry, index) => (
-                            <Cell key={`cell-exp-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value: any, name: any, props: any) => [formatBRL(props.payload.amount), props.payload.name]} />
-                      </RePieChart>
-                    </ResponsiveContainer>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-gray-700">Despesas por categoria</p>
+                  <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+                    <button
+                      onClick={() => setDespesasSoConfirmados(true)}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${despesasSoConfirmados ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      Confirmado
+                    </button>
+                    <button
+                      onClick={() => setDespesasSoConfirmados(false)}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${!despesasSoConfirmados ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      Todos
+                    </button>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  {expenseCategories.map((cat) => (
-                    <div key={cat.name} className="flex items-center justify-between text-sm py-1 border-b border-gray-50">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
-                        <span className="text-gray-700">{cat.name}</span>
-                        <span className="text-gray-400 text-xs font-medium">{cat.value.toFixed(1)}%</span>
+                {(() => {
+                  const cats  = despesasSoConfirmados ? expenseCategories : expenseCategoriesProj;
+                  const total = despesasSoConfirmados ? totalExpenses : totalExpensesProj;
+                  return (
+                    <>
+                      <div className="flex justify-center mb-6">
+                        <div className="w-full max-w-[224px] h-52 mx-auto">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RePieChart>
+                              <Pie data={cats} innerRadius={70} outerRadius={105} paddingAngle={2}
+                                dataKey="value" startAngle={90} endAngle={-270}>
+                                {cats.map((entry, index) => (
+                                  <Cell key={`cell-exp-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip formatter={(value: any, name: any, props: any) => [formatBRL(props.payload.amount), props.payload.name]} />
+                            </RePieChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
-                      <span className="text-red-500 font-medium">-{formatBRL(cat.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-between items-center mt-4 pt-3 border-t font-bold text-sm">
-                  <span className="text-gray-800">Total confirmado</span>
-                  <span className="text-red-500">-{formatBRL(totalExpenses)}</span>
-                </div>
+                      <div className="space-y-2">
+                        {cats.map((cat) => (
+                          <div key={cat.name} className="flex items-center justify-between text-sm py-1 border-b border-gray-50">
+                            <div className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
+                              <span className="text-gray-700">{cat.name}</span>
+                              <span className="text-gray-400 text-xs font-medium">{cat.value.toFixed(1)}%</span>
+                            </div>
+                            <span className="text-red-500 font-medium">-{formatBRL(cat.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between items-center mt-4 pt-3 border-t font-bold text-sm">
+                        <span className="text-gray-800">Total {despesasSoConfirmados ? 'confirmado' : 'projetado'}</span>
+                        <span className="text-red-500">-{formatBRL(total)}</span>
+                      </div>
+                    </>
+                  );
+                })()}
               </Card>
 
               {/* Receitas por categoria */}
               <Card className="col-span-1 md:col-span-6">
-                <p className="text-sm font-semibold text-gray-700 mb-0.5">Receitas por categoria</p>
-                <div className="flex gap-3 mb-4">
-                  <span className="text-xs text-emerald-600 font-semibold border-b-2 border-emerald-500 pb-0.5">Confirmado</span>
-                  <span className="text-xs text-gray-400">Projetado: +{formatBRL(totalIncomeProj)}</span>
-                </div>
-
-                <div className="flex justify-center mb-6">
-                  <div className="w-full max-w-[224px] h-52 mx-auto">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RePieChart>
-                        <Pie data={incomeCategories} innerRadius={70} outerRadius={105} paddingAngle={2}
-                          dataKey="value" startAngle={90} endAngle={-270}>
-                          {incomeCategories.map((entry, index) => (
-                            <Cell key={`cell-inc-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value: any, name: any, props: any) => [formatBRL(props.payload.amount), props.payload.name]} />
-                      </RePieChart>
-                    </ResponsiveContainer>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-gray-700">Receitas por categoria</p>
+                  <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+                    <button
+                      onClick={() => setReceitasSoConfirmados(true)}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${receitasSoConfirmados ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      Confirmado
+                    </button>
+                    <button
+                      onClick={() => setReceitasSoConfirmados(false)}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${!receitasSoConfirmados ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      Todos
+                    </button>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  {incomeCategories.map((cat) => (
-                    <div key={cat.name} className="flex items-center justify-between text-sm py-1 border-b border-gray-50">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
-                        <span className="text-gray-700">{cat.name}</span>
-                        <span className="text-gray-400 text-xs font-medium">{cat.value.toFixed(1)}%</span>
+                {(() => {
+                  const cats  = receitasSoConfirmados ? incomeCategories : incomeCategoriesProj;
+                  const total = receitasSoConfirmados ? totalIncome : totalIncomeProj;
+                  return (
+                    <>
+                      <div className="flex justify-center mb-6">
+                        <div className="w-full max-w-[224px] h-52 mx-auto">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RePieChart>
+                              <Pie data={cats} innerRadius={70} outerRadius={105} paddingAngle={2}
+                                dataKey="value" startAngle={90} endAngle={-270}>
+                                {cats.map((entry, index) => (
+                                  <Cell key={`cell-inc-${index}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip formatter={(value: any, name: any, props: any) => [formatBRL(props.payload.amount), props.payload.name]} />
+                            </RePieChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
-                      <span className="text-emerald-600 font-medium">+{formatBRL(cat.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-between items-center mt-4 pt-3 border-t font-bold text-sm">
-                  <span className="text-gray-800">Total confirmado</span>
-                  <span className="text-emerald-600">+{formatBRL(totalIncome)}</span>
-                </div>
+                      <div className="space-y-2">
+                        {cats.map((cat) => (
+                          <div key={cat.name} className="flex items-center justify-between text-sm py-1 border-b border-gray-50">
+                            <div className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
+                              <span className="text-gray-700">{cat.name}</span>
+                              <span className="text-gray-400 text-xs font-medium">{cat.value.toFixed(1)}%</span>
+                            </div>
+                            <span className="text-emerald-600 font-medium">+{formatBRL(cat.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between items-center mt-4 pt-3 border-t font-bold text-sm">
+                        <span className="text-gray-800">Total {receitasSoConfirmados ? 'confirmado' : 'projetado'}</span>
+                        <span className="text-emerald-600">+{formatBRL(total)}</span>
+                      </div>
+                    </>
+                  );
+                })()}
               </Card>
 
               {/* Contas a pagar e a receber lado a lado */}
@@ -1177,6 +1307,9 @@ function AppContent(): JSX.Element {
               <TransactionTable
                 transactions={txDoMes}
                 categorias={categorias}
+                contas={contas}
+                saldoAnterior={saldoAnterior}
+                labelMesAnterior={labelMesAnterior}
                 onDelete={(id) => setLocalTransactions(prev => prev.filter(t => t.id !== id))}
                 onEdit={(updated) => setLocalTransactions(prev => prev.map(t => t.id === updated.id ? updated : t))}
               />
@@ -1221,28 +1354,29 @@ function AppContent(): JSX.Element {
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/40" onClick={() => setIsNewOpen(false)} />
             <div className="bg-white rounded-xl shadow-xl p-5 z-10 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
-              <h3 className="text-lg font-bold mb-4">Nova transação</h3>
-              <NewTransactionForm
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-gray-800">Nova transação</h3>
+                <button onClick={() => setIsNewOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+              </div>
+              <TxForm
                 categorias={categorias}
+                contas={contas}
+                submitLabel="Criar"
                 onCancel={() => setIsNewOpen(false)}
-                onCreate={async (data) => {
+                onSave={async (data) => {
                   const payload = {
-                    date: isoToBR(data.date),
-                    desc: data.desc,
-                    cat: data.cat || 'Outras Despesas',
+                    date:    isoToBR(data.date),
+                    desc:    data.desc,
+                    cat:     data.cat || 'Outras Despesas',
                     account: data.account || 'Conta corrente',
-                    value:
-                      data.type === 'income'
-                        ? Math.abs(Number(data.value))
-                        : -Math.abs(Number(data.value)),
+                    value:   data.type === 'income'
+                      ? Math.abs(Number(data.value))
+                      : -Math.abs(Number(data.value)),
                     status: data.status || 'confirmed',
-                    type: data.type,
+                    type:   data.type,
                   } as any;
                   const ok = await handleAddTransaction(payload);
-                  if (ok) {
-                    await fetchDashboard();
-                    setIsNewOpen(false);
-                  }
+                  if (ok) { await fetchDashboard(); setIsNewOpen(false); }
                 }}
               />
             </div>
