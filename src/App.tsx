@@ -15,6 +15,9 @@ import {
   TrendingUp,
   BookOpen,
   Menu,
+  Building2,
+  ChevronLeft,
+  ChevronRight as ChevronRightIcon,
 } from 'lucide-react';
 import {
   XAxis,
@@ -34,9 +37,10 @@ import { Card } from './components/Card';
 import { SidebarItem } from './components/SidebarItem';
 import { TransactionTable } from './components/TransactionTable';
 import { PlanoContas, Categoria } from './components/PlanoContas';
+import { CadastroContas } from './components/CadastroContas';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useFinanceData } from './hooks/useFinanceData';
-import { ViewType, Transaction } from './types';
+import { ViewType, Transaction, Conta } from './types';
 
 // Categorias padrão iniciais
 const initialCategorias: Categoria[] = [
@@ -306,6 +310,27 @@ function AppContent(): JSX.Element {
     } catch { return initialCategorias; }
   });
 
+  const [contas, setContas] = useState<Conta[]>(() => {
+    try {
+      const saved = localStorage.getItem('focusfinan:contas');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  // Mês selecionado
+  const hoje = new Date();
+  const [mesSel, setMesSel] = useState({ mes: hoje.getMonth(), ano: hoje.getFullYear() });
+
+  const irMesAnterior = () => setMesSel(({ mes, ano }) =>
+    mes === 0 ? { mes: 11, ano: ano - 1 } : { mes: mes - 1, ano }
+  );
+  const irMesSeguinte = () => setMesSel(({ mes, ano }) =>
+    mes === 11 ? { mes: 0, ano: ano + 1 } : { mes: mes + 1, ano }
+  );
+  const nomeMes = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
+    .format(new Date(mesSel.ano, mesSel.mes, 1))
+    .replace(/^\w/, c => c.toUpperCase());
+
   // Salva automaticamente no localStorage sempre que mudar
   useEffect(() => {
     localStorage.setItem('focusfinan:transactions', JSON.stringify(localTransactions));
@@ -318,6 +343,10 @@ function AppContent(): JSX.Element {
   useEffect(() => {
     localStorage.setItem('focusfinan:categorias', JSON.stringify(categorias));
   }, [categorias]);
+
+  useEffect(() => {
+    localStorage.setItem('focusfinan:contas', JSON.stringify(contas));
+  }, [contas]);
 
   const API_BASE = import.meta.env.VITE_API_URL ?? '';
   const financeData = useFinanceData(localTransactions, API_BASE);
@@ -357,40 +386,81 @@ function AppContent(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const flowChartData = useMemo(
-    () => groupByDate(localTransactions),
-    [localTransactions]
+  // Transações do mês selecionado
+  const txDoMes = useMemo(() =>
+    localTransactions.filter(t => {
+      const dt = parseDate(t.date);
+      return dt.getMonth() === mesSel.mes && dt.getFullYear() === mesSel.ano;
+    }),
+    [localTransactions, mesSel]
   );
 
-  const saldoPorConta = useMemo(
-    () => getSaldoPorConta(localTransactions),
-    [localTransactions]
-  );
+  // Apenas confirmadas do mês
+  const txConfirmadas = useMemo(() => txDoMes.filter(t => t.status === 'confirmed'), [txDoMes]);
+
+  // Gráfico de fluxo: só confirmadas do mês
+  const flowChartData = useMemo(() => groupByDate(txConfirmadas), [txConfirmadas]);
+
+  // Saldo por conta = saldo inicial cadastrado + todas as confirmadas (histórico completo)
+  const saldoPorConta = useMemo(() => {
+    const confirmadosTodos = localTransactions.filter(t => t.status === 'confirmed');
+    const map = new Map<string, number>();
+    // Parte do saldo inicial das contas cadastradas
+    contas.forEach(c => {
+      const si = c.saldoInicialTipo === 'credor' ? c.saldoInicial : -c.saldoInicial;
+      map.set(c.nome, si);
+    });
+    // Soma confirmadas
+    confirmadosTodos.forEach(t => {
+      map.set(t.account, (map.get(t.account) ?? 0) + Number(t.value));
+    });
+    return Array.from(map.entries()).map(([conta, saldo]) => ({ conta, saldo }));
+  }, [localTransactions, contas]);
+
+  // Saldo projetado por conta = saldo confirmado + pendentes
+  const saldoProjetadoPorConta = useMemo(() => {
+    const pendentes = localTransactions.filter(t => t.status === 'pending');
+    return saldoPorConta.map(({ conta, saldo }) => {
+      const proj = pendentes
+        .filter(t => t.account === conta)
+        .reduce((a, t) => a + Number(t.value), 0);
+      return { conta, saldoConfirmado: saldo, saldoProjetado: saldo + proj };
+    });
+  }, [saldoPorConta, localTransactions]);
 
   const saldoTotal = useMemo(
-    () => saldoPorConta.reduce((acc, { saldo }) => acc + saldo, 0),
+    () => saldoPorConta.reduce((a, { saldo }) => a + saldo, 0),
     [saldoPorConta]
   );
+  const saldoProjetadoTotal = useMemo(
+    () => saldoProjetadoPorConta.reduce((a, c) => a + c.saldoProjetado, 0),
+    [saldoProjetadoPorConta]
+  );
 
+  // Categorias — confirmadas do mês (realizadas)
   const expenseCategories = useMemo(
-    () => getCategorySummary(localTransactions, 'expense', categorias),
-    [localTransactions, categorias]
+    () => getCategorySummary(txConfirmadas, 'expense', categorias),
+    [txConfirmadas, categorias]
   );
-
   const incomeCategories = useMemo(
-    () => getCategorySummary(localTransactions, 'income', categorias),
-    [localTransactions, categorias]
+    () => getCategorySummary(txConfirmadas, 'income', categorias),
+    [txConfirmadas, categorias]
   );
 
-  const totalExpenses = useMemo(
-    () => expenseCategories.reduce((acc, c) => acc + c.amount, 0),
-    [expenseCategories]
+  // Categorias — projetadas do mês (confirmadas + pendentes)
+  const expenseCategoriesProj = useMemo(
+    () => getCategorySummary(txDoMes, 'expense', categorias),
+    [txDoMes, categorias]
+  );
+  const incomeCategoriesProj = useMemo(
+    () => getCategorySummary(txDoMes, 'income', categorias),
+    [txDoMes, categorias]
   );
 
-  const totalIncome = useMemo(
-    () => incomeCategories.reduce((acc, c) => acc + c.amount, 0),
-    [incomeCategories]
-  );
+  const totalExpenses     = useMemo(() => expenseCategories.reduce((a,c) => a+c.amount, 0),     [expenseCategories]);
+  const totalIncome       = useMemo(() => incomeCategories.reduce((a,c) => a+c.amount, 0),       [incomeCategories]);
+  const totalExpensesProj = useMemo(() => expenseCategoriesProj.reduce((a,c) => a+c.amount, 0), [expenseCategoriesProj]);
+  const totalIncomeProj   = useMemo(() => incomeCategoriesProj.reduce((a,c) => a+c.amount, 0),  [incomeCategoriesProj]);
 
   // Converte DD/MM/YYYY → DD/MM/YY (formato interno)
   const normalizeDateFromCSV = (d: string): string => {
@@ -597,6 +667,12 @@ function AppContent(): JSX.Element {
             {isSidebarOpen ? 'Configurações' : '---'}
           </div>
           <SidebarItem
+            icon={Building2}
+            label="Contas"
+            active={currentView === 'contas'}
+            onClick={() => setCurrentView('contas')}
+          />
+          <SidebarItem
             icon={BookOpen}
             label="Plano de Contas"
             active={currentView === 'plano-contas'}
@@ -626,8 +702,9 @@ function AppContent(): JSX.Element {
               <Menu className="w-5 h-5" />
             </button>
             <h2 className="text-base md:text-lg font-semibold text-gray-700">
-              {currentView === 'visao-geral' ? 'Visão Geral'
+              {currentView === 'visao-geral'  ? 'Visão Geral'
                 : currentView === 'lancamentos' ? 'Lançamentos'
+                : currentView === 'contas'      ? 'Contas'
                 : 'Plano de Contas'}
             </h2>
           </div>
@@ -666,9 +743,10 @@ function AppContent(): JSX.Element {
           </div>
           <nav className="py-4">
             {[
-              { icon: LayoutDashboard, label: 'Visão geral',      view: 'visao-geral'  as ViewType },
-              { icon: ArrowLeftRight,  label: 'Lançamentos',      view: 'lancamentos'  as ViewType },
-              { icon: BookOpen,        label: 'Plano de Contas',  view: 'plano-contas' as ViewType },
+              { icon: LayoutDashboard, label: 'Visão geral',     view: 'visao-geral'  as ViewType },
+              { icon: ArrowLeftRight,  label: 'Lançamentos',     view: 'lancamentos'  as ViewType },
+              { icon: Building2,       label: 'Contas',          view: 'contas'       as ViewType },
+              { icon: BookOpen,        label: 'Plano de Contas', view: 'plano-contas' as ViewType },
             ].map(({ icon: Icon, label, view }) => (
               <button
                 key={view}
@@ -700,137 +778,183 @@ function AppContent(): JSX.Element {
 
           {currentView === 'visao-geral' ? (
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 pb-20">
-              {/* Fluxo de caixa */}
-              <Card title="Fluxo de caixa" className="col-span-1 md:col-span-12">
+
+              {/* ── Card seletor de mês + saldo confirmado vs projetado ── */}
+              <Card className="col-span-1 md:col-span-12">
+
+                {/* Navegação de mês */}
+                <div className="flex items-center justify-between mb-5">
+                  <button onClick={irMesAnterior}
+                    className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="font-semibold text-gray-700 text-sm">{nomeMes}</span>
+                  <button onClick={irMesSeguinte}
+                    className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
+                    <ChevronRightIcon className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Tabela contas — Confirmado vs Projetado */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="text-left py-2 text-xs font-semibold text-gray-400 w-6" />
+                        <th className="text-left py-2 text-xs font-semibold text-gray-400 pl-1">Conta</th>
+                        <th className="text-right py-2 text-xs font-semibold text-emerald-600 pr-6">Confirmado</th>
+                        <th className="text-right py-2 text-xs font-semibold text-gray-400">Projetado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {saldoProjetadoPorConta.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="py-4 text-center text-xs text-gray-300">
+                            Cadastre suas contas em Configurações → Contas
+                          </td>
+                        </tr>
+                      )}
+                      {saldoProjetadoPorConta.map(({ conta, saldoConfirmado, saldoProjetado }, i) => (
+                        <tr key={conta} className="border-b border-gray-50 hover:bg-gray-50/50">
+                          <td className="py-2.5">
+                            <input type="checkbox" defaultChecked
+                              className="w-4 h-4 accent-emerald-500 rounded cursor-pointer" />
+                          </td>
+                          <td className="py-2.5 pl-1">
+                            <div className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: ['#10b981','#6366f1','#f59e0b','#ec4899'][i % 4] }} />
+                              <span className="text-gray-700 font-medium">{conta}</span>
+                            </div>
+                          </td>
+                          <td className={`py-2.5 text-right font-semibold pr-6 ${saldoConfirmado < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                            {saldoConfirmado < 0 ? '-' : ''}{Math.abs(saldoConfirmado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className={`py-2.5 text-right font-semibold ${saldoProjetado < 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                            {saldoProjetado < 0 ? '-' : ''}{Math.abs(saldoProjetado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-gray-200">
+                        <td />
+                        <td className="py-3 pl-1 font-bold text-gray-800 text-sm">Total</td>
+                        <td className={`py-3 text-right font-bold pr-6 text-sm ${saldoTotal < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                          {saldoTotal < 0 ? '-' : ''}{Math.abs(saldoTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className={`py-3 text-right font-bold text-sm ${saldoProjetadoTotal < 0 ? 'text-red-500' : 'text-gray-500'}`}>
+                          {saldoProjetadoTotal < 0 ? '-' : ''}{Math.abs(saldoProjetadoTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Resultados do mês */}
+                <div className="mt-5 pt-4 border-t border-gray-100">
+                  <p className="text-xs text-center text-gray-400 mb-3 font-medium">Resultados (R$)</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-y-2 gap-x-4 text-sm">
+                    <div>
+                      <div className="flex justify-between sm:block">
+                        <span className="text-gray-500">Entradas</span>
+                        <span className="text-emerald-600 font-semibold sm:block">{formatBRL(totalIncome)}</span>
+                      </div>
+                      <div className="flex justify-between sm:block pl-3 sm:pl-0">
+                        <span className="text-xs text-gray-400">Receitas</span>
+                        <span className="text-xs text-emerald-500">{formatBRL(totalIncome)}</span>
+                      </div>
+                      <div className="flex justify-between sm:block pl-3 sm:pl-0">
+                        <span className="text-xs text-gray-400">Transferências</span>
+                        <span className="text-xs text-gray-400">0,00</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between sm:block">
+                        <span className="text-gray-500">Saídas</span>
+                        <span className="text-red-500 font-semibold sm:block">-{formatBRL(totalExpenses)}</span>
+                      </div>
+                      <div className="flex justify-between sm:block pl-3 sm:pl-0">
+                        <span className="text-xs text-gray-400">Despesas</span>
+                        <span className="text-xs text-red-400">-{formatBRL(totalExpenses)}</span>
+                      </div>
+                      <div className="flex justify-between sm:block pl-3 sm:pl-0">
+                        <span className="text-xs text-gray-400">Transferências</span>
+                        <span className="text-xs text-gray-400">0,00</span>
+                      </div>
+                    </div>
+                    <div className="pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                      <div className="flex justify-between sm:block">
+                        <span className="text-gray-700 font-bold">Resultado</span>
+                        <span className={`font-bold sm:block ${(totalIncome - totalExpenses) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {(totalIncome - totalExpenses) < 0 ? '-' : ''}{formatBRL(Math.abs(totalIncome - totalExpenses))}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Fluxo de caixa — só confirmados do mês */}
+              <Card title="Fluxo de caixa (confirmado)" className="col-span-1 md:col-span-12">
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={flowChartData} margin={{ left: 10, right: 20 }}>
                       <CartesianGrid strokeDasharray="" vertical={false} stroke="#eeeeee" />
-                      <XAxis
-                        dataKey="name"
-                        fontSize={11}
-                        tickLine={false}
-                        axisLine={false}
-                        stroke="#aaaaaa"
-                      />
-                      <YAxis
-                        fontSize={11}
-                        tickLine={false}
-                        axisLine={false}
-                        stroke="#aaaaaa"
-                        tickFormatter={(v: number) =>
-                          v === 0 ? '0' : `${(v / 1000).toFixed(0)} mil`
-                        }
-                      />
+                      <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} stroke="#aaaaaa" />
+                      <YAxis fontSize={11} tickLine={false} axisLine={false} stroke="#aaaaaa"
+                        tickFormatter={(v: number) => v === 0 ? '0' : `${(v/1000).toFixed(0)}k`} />
                       <Tooltip
                         formatter={(value: any) => [formatBRL(Number(value)), 'Saldo']}
                         labelStyle={{ color: '#555' }}
                         contentStyle={{ fontSize: 12, borderRadius: 8 }}
                       />
                       <ReferenceLine y={0} stroke="#bbbbbb" strokeWidth={1} />
-                      {/* Saldo positivo — cinza */}
-                      <Line
-                        type="monotone"
-                        dataKey="saldo"
-                        stroke="#999999"
-                        strokeWidth={2.5}
-                        dot={false}
-                        connectNulls={false}
-                        name="Saldo"
-                      />
-                      {/* Saldo negativo — vermelho */}
-                      <Line
-                        type="monotone"
-                        dataKey="saldoNegativo"
-                        stroke="#c62828"
-                        strokeWidth={2.5}
-                        dot={false}
-                        connectNulls={false}
-                        name="Saldo negativo"
-                      />
+                      <Line type="monotone" dataKey="saldo" stroke="#10b981" strokeWidth={2.5} dot={false} connectNulls={false} name="Saldo" />
+                      <Line type="monotone" dataKey="saldoNegativo" stroke="#c62828" strokeWidth={2.5} dot={false} connectNulls={false} name="Saldo negativo" />
                     </LineChart>
                   </ResponsiveContainer>
-                </div>
-
-                {/* Rodapé com saldo por conta */}
-                <div className="mt-4 border-t pt-3 text-sm">
-                  <div className="flex justify-end text-xs text-gray-400 italic mb-2">
-                    Saldo atual
-                  </div>
-                  {saldoPorConta.map(({ conta, saldo }, i) => (
-                    <div key={conta} className="flex justify-between items-center mb-1">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-3 h-3 rounded-full inline-block"
-                          style={{ backgroundColor: i === 0 ? '#999999' : '#90caf9' }}
-                        />
-                        <span className="text-gray-700">{conta}</span>
-                      </div>
-                      <span className={saldo < 0 ? 'text-red-600 font-medium' : 'text-gray-700 font-medium'}>
-                        {formatBRL(saldo)}
-                      </span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between items-center mt-3 border-t pt-3 font-bold">
-                    <span>Total</span>
-                    <span className={saldoTotal < 0 ? 'text-red-600' : 'text-emerald-600'}>
-                      {formatBRL(saldoTotal)}
-                    </span>
-                  </div>
                 </div>
               </Card>
 
               {/* Despesas por categoria */}
               <Card className="col-span-1 md:col-span-6">
                 <p className="text-sm font-semibold text-gray-700 mb-0.5">Despesas por categoria</p>
-                <p className="text-xs text-gray-400 mb-4">Situação projetada</p>
+                <div className="flex gap-3 mb-4">
+                  <span className="text-xs text-emerald-600 font-semibold border-b-2 border-emerald-500 pb-0.5">Confirmado</span>
+                  <span className="text-xs text-gray-400">Projetado: -{formatBRL(totalExpensesProj)}</span>
+                </div>
 
-                {/* Gráfico centralizado */}
                 <div className="flex justify-center mb-6">
                   <div className="w-full max-w-[224px] h-52 mx-auto">
                     <ResponsiveContainer width="100%" height="100%">
                       <RePieChart>
-                        <Pie
-                          data={expenseCategories}
-                          innerRadius={70}
-                          outerRadius={105}
-                          paddingAngle={2}
-                          dataKey="value"
-                          startAngle={90}
-                          endAngle={-270}
-                        >
+                        <Pie data={expenseCategories} innerRadius={70} outerRadius={105} paddingAngle={2}
+                          dataKey="value" startAngle={90} endAngle={-270}>
                           {expenseCategories.map((entry, index) => (
                             <Cell key={`cell-exp-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip
-                          formatter={(value: any, name: any, props: any) => [
-                            formatBRL(props.payload.amount),
-                            props.payload.name,
-                          ]}
-                        />
+                        <Tooltip formatter={(value: any, name: any, props: any) => [formatBRL(props.payload.amount), props.payload.name]} />
                       </RePieChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
 
-                {/* Legenda em lista */}
                 <div className="space-y-2">
                   {expenseCategories.map((cat) => (
                     <div key={cat.name} className="flex items-center justify-between text-sm py-1 border-b border-gray-50">
                       <div className="flex items-center gap-2">
                         <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
                         <span className="text-gray-700">{cat.name}</span>
-                        <span className="text-gray-400 text-xs font-medium">{cat.value.toFixed(2)}%</span>
+                        <span className="text-gray-400 text-xs font-medium">{cat.value.toFixed(1)}%</span>
                       </div>
                       <span className="text-red-500 font-medium">-{formatBRL(cat.amount)}</span>
                     </div>
                   ))}
                 </div>
-
-                {/* Total */}
                 <div className="flex justify-between items-center mt-4 pt-3 border-t font-bold text-sm">
-                  <span className="text-gray-800">Total</span>
+                  <span className="text-gray-800">Total confirmado</span>
                   <span className="text-red-500">-{formatBRL(totalExpenses)}</span>
                 </div>
               </Card>
@@ -838,31 +962,22 @@ function AppContent(): JSX.Element {
               {/* Receitas por categoria */}
               <Card className="col-span-1 md:col-span-6">
                 <p className="text-sm font-semibold text-gray-700 mb-0.5">Receitas por categoria</p>
-                <p className="text-xs text-gray-400 mb-4">Situação projetada</p>
+                <div className="flex gap-3 mb-4">
+                  <span className="text-xs text-emerald-600 font-semibold border-b-2 border-emerald-500 pb-0.5">Confirmado</span>
+                  <span className="text-xs text-gray-400">Projetado: +{formatBRL(totalIncomeProj)}</span>
+                </div>
 
                 <div className="flex justify-center mb-6">
                   <div className="w-full max-w-[224px] h-52 mx-auto">
                     <ResponsiveContainer width="100%" height="100%">
                       <RePieChart>
-                        <Pie
-                          data={incomeCategories}
-                          innerRadius={70}
-                          outerRadius={105}
-                          paddingAngle={2}
-                          dataKey="value"
-                          startAngle={90}
-                          endAngle={-270}
-                        >
+                        <Pie data={incomeCategories} innerRadius={70} outerRadius={105} paddingAngle={2}
+                          dataKey="value" startAngle={90} endAngle={-270}>
                           {incomeCategories.map((entry, index) => (
                             <Cell key={`cell-inc-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip
-                          formatter={(value: any, name: any, props: any) => [
-                            formatBRL(props.payload.amount),
-                            props.payload.name,
-                          ]}
-                        />
+                        <Tooltip formatter={(value: any, name: any, props: any) => [formatBRL(props.payload.amount), props.payload.name]} />
                       </RePieChart>
                     </ResponsiveContainer>
                   </div>
@@ -874,15 +989,14 @@ function AppContent(): JSX.Element {
                       <div className="flex items-center gap-2">
                         <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
                         <span className="text-gray-700">{cat.name}</span>
-                        <span className="text-gray-400 text-xs font-medium">{cat.value.toFixed(2)}%</span>
+                        <span className="text-gray-400 text-xs font-medium">{cat.value.toFixed(1)}%</span>
                       </div>
                       <span className="text-emerald-600 font-medium">+{formatBRL(cat.amount)}</span>
                     </div>
                   ))}
                 </div>
-
                 <div className="flex justify-between items-center mt-4 pt-3 border-t font-bold text-sm">
-                  <span className="text-gray-800">Total</span>
+                  <span className="text-gray-800">Total confirmado</span>
                   <span className="text-emerald-600">+{formatBRL(totalIncome)}</span>
                 </div>
               </Card>
@@ -1055,6 +1169,8 @@ function AppContent(): JSX.Element {
                 onEdit={(updated) => setLocalTransactions(prev => prev.map(t => t.id === updated.id ? updated : t))}
               />
             </div>
+          ) : currentView === 'contas' ? (
+            <CadastroContas contas={contas} onChange={setContas} />
           ) : (
             <PlanoContas categorias={categorias} onChange={setCategorias} />
           )}

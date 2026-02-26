@@ -119,10 +119,13 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
     });
   }, [sorted]);
 
-  // Totais
-  const totalEntradas = transactions.filter(t => t.value > 0).reduce((a, t) => a + t.value, 0);
-  const totalSaidas   = transactions.filter(t => t.value < 0).reduce((a, t) => a + Math.abs(t.value), 0);
+  // Totais — só confirmadas
+  const totalEntradas = transactions.filter(t => t.value > 0 && t.status === 'confirmed').reduce((a, t) => a + t.value, 0);
+  const totalSaidas   = transactions.filter(t => t.value < 0 && t.status === 'confirmed').reduce((a, t) => a + Math.abs(t.value), 0);
+  const totalEntradasProj = transactions.filter(t => t.value > 0).reduce((a, t) => a + t.value, 0);
+  const totalSaidasProj   = transactions.filter(t => t.value < 0).reduce((a, t) => a + Math.abs(t.value), 0);
   const resultado     = totalEntradas - totalSaidas;
+  const resultadoProj = totalEntradasProj - totalSaidasProj;
 
   // Seleção
   const allIds       = rows.map(t => t.id);
@@ -184,7 +187,10 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
       <div className="w-full md:w-56 md:flex-shrink-0">
         <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm text-sm">
           <div className="font-semibold text-gray-700 mb-3">Resultados (R$)</div>
-          <div className="space-y-1">
+
+          {/* Confirmado */}
+          <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Confirmado</p>
+          <div className="space-y-1 mb-3">
             <div className="flex justify-between">
               <span className="text-gray-500">Entradas</span>
               <span className="text-emerald-600 font-medium">{formatBRL(totalEntradas)}</span>
@@ -193,11 +199,7 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
               <span className="text-gray-400 text-xs">Receitas</span>
               <span className="text-emerald-500 text-xs">{formatBRL(totalEntradas)}</span>
             </div>
-            <div className="flex justify-between pl-3">
-              <span className="text-gray-400 text-xs">Transferências</span>
-              <span className="text-gray-400 text-xs">0,00</span>
-            </div>
-            <div className="flex justify-between mt-2">
+            <div className="flex justify-between mt-1">
               <span className="text-gray-500">Saídas</span>
               <span className="text-red-500 font-medium">-{formatBRL(totalSaidas)}</span>
             </div>
@@ -205,14 +207,29 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
               <span className="text-gray-400 text-xs">Despesas</span>
               <span className="text-red-400 text-xs">-{formatBRL(totalSaidas)}</span>
             </div>
-            <div className="flex justify-between pl-3">
-              <span className="text-gray-400 text-xs">Transferências</span>
-              <span className="text-gray-400 text-xs">0,00</span>
-            </div>
-            <div className="flex justify-between mt-3 pt-3 border-t font-bold">
+            <div className="flex justify-between mt-2 pt-2 border-t font-bold">
               <span className="text-gray-700">Resultado</span>
               <span className={resultado >= 0 ? 'text-emerald-600' : 'text-red-500'}>
-                {resultado < 0 ? '-' : ''}{formatBRL(resultado)}
+                {resultado < 0 ? '-' : ''}{formatBRL(Math.abs(resultado))}
+              </span>
+            </div>
+          </div>
+
+          {/* Projetado */}
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 mt-3">Projetado</p>
+          <div className="space-y-1">
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-xs">Entradas</span>
+              <span className="text-emerald-500 text-xs">{formatBRL(totalEntradasProj)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-400 text-xs">Saídas</span>
+              <span className="text-red-400 text-xs">-{formatBRL(totalSaidasProj)}</span>
+            </div>
+            <div className="flex justify-between mt-1 pt-1 border-t">
+              <span className="text-gray-500 text-xs font-bold">Resultado</span>
+              <span className={`text-xs font-bold ${resultadoProj >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                {resultadoProj < 0 ? '-' : ''}{formatBRL(Math.abs(resultadoProj))}
               </span>
             </div>
           </div>
