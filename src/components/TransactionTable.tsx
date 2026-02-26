@@ -97,25 +97,29 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
     return transactions;
   }, [transactions, filter]);
 
-  // Ordena por data
+  // Ordena: todos os confirmados por data primeiro, depois todos os pendentes por data
   const sorted = useMemo(() => {
+    const parseDate = (d: string) => {
+      const p = d.split('/');
+      if (p.length < 3) return 0;
+      let y = Number(p[2]); if (y < 100) y += 2000;
+      return new Date(y, Number(p[1]) - 1, Number(p[0])).getTime();
+    };
+    const statusOrder = (s: string) => s === 'confirmed' ? 0 : 1;
+
     return [...filtered].sort((a, b) => {
-      const parse = (d: string) => {
-        const p = d.split('/');
-        if (p.length < 3) return 0;
-        let y = Number(p[2]); if (y < 100) y += 2000;
-        return new Date(y, Number(p[1]) - 1, Number(p[0])).getTime();
-      };
-      return parse(a.date) - parse(b.date);
+      const statusDiff = statusOrder(a.status) - statusOrder(b.status);
+      if (statusDiff !== 0) return statusDiff;
+      return parseDate(a.date) - parseDate(b.date);
     });
   }, [filtered]);
 
-  // Saldo acumulado
+  // Saldo acumulado — só confirmadas atualizam o saldo; pendentes mostram traço
   const rows = useMemo(() => {
     let saldo = 0;
     return sorted.map(t => {
-      saldo += Number(t.value);
-      return { ...t, saldoAcumulado: saldo };
+      if (t.status === 'confirmed') saldo += Number(t.value);
+      return { ...t, saldoAcumulado: t.status === 'confirmed' ? saldo : null };
     });
   }, [sorted]);
 
@@ -360,9 +364,15 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
                   />
                 </div>
 
-                {/* Saldo acumulado */}
-                <div className={`hidden sm:block w-28 text-right text-sm font-semibold ${t.saldoAcumulado >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {t.saldoAcumulado < 0 ? '-' : ''}{formatBRL(t.saldoAcumulado)}
+                {/* Saldo acumulado — só confirmadas */}
+                <div className={`hidden sm:block w-28 text-right text-sm font-semibold ${
+                  t.saldoAcumulado === null ? 'text-gray-300'
+                  : t.saldoAcumulado >= 0   ? 'text-emerald-600'
+                  :                           'text-red-500'
+                }`}>
+                  {t.saldoAcumulado === null
+                    ? '—'
+                    : `${t.saldoAcumulado < 0 ? '-' : ''}${formatBRL(t.saldoAcumulado)}`}
                 </div>
               </div>
             );
@@ -374,7 +384,7 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
       {editingTx && editForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setEditingTx(null)} />
-          <div className="bg-white rounded-2xl shadow-2xl p-6 z-10 w-full max-w-md mx-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 z-10 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-base font-bold text-gray-800">Editar lançamento</h3>
               <button onClick={() => setEditingTx(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
@@ -502,7 +512,7 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/30" onClick={() => setConfirmDelete(false)} />
-          <div className="bg-white rounded-xl shadow-xl p-6 z-10 w-80">
+          <div className="bg-white rounded-xl shadow-xl p-6 z-10 w-full max-w-xs mx-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <Trash2 className="w-5 h-5 text-red-500" />

@@ -1011,13 +1011,13 @@ function AppContent(): JSX.Element {
                     <p className="text-sm font-semibold text-gray-700">Contas a pagar</p>
                   </div>
 
-                  {localTransactions.filter(
+                  {txDoMes.filter(
                     (t) => t.type === 'expense' && t.status === 'pending'
                   ).length === 0 ? (
                     <p className="text-sm text-gray-400 text-center py-6">Nenhuma conta pendente</p>
                   ) : (
                     <div className="space-y-1">
-                      {localTransactions
+                      {txDoMes
                         .filter((t) => t.type === 'expense' && t.status === 'pending')
                         .map((t) => (
                           <div key={t.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
@@ -1056,7 +1056,7 @@ function AppContent(): JSX.Element {
                     <span className="text-gray-800">Total</span>
                     <span className="text-red-500">
                       -{formatBRL(
-                        localTransactions
+                        txDoMes
                           .filter((t) => t.type === 'expense' && t.status === 'pending')
                           .reduce((acc, t) => acc + Math.abs(t.value), 0)
                       )}
@@ -1071,13 +1071,13 @@ function AppContent(): JSX.Element {
                     <p className="text-sm font-semibold text-gray-700">Contas a receber</p>
                   </div>
 
-                  {localTransactions.filter(
+                  {txDoMes.filter(
                     (t) => t.type === 'income' && t.status === 'pending'
                   ).length === 0 ? (
                     <p className="text-sm text-gray-400 text-center py-6">Nenhuma receita pendente</p>
                   ) : (
                     <div className="space-y-1">
-                      {localTransactions
+                      {txDoMes
                         .filter((t) => t.type === 'income' && t.status === 'pending')
                         .map((t) => (
                           <div key={t.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
@@ -1114,7 +1114,7 @@ function AppContent(): JSX.Element {
                     <span className="text-gray-800">Total</span>
                     <span className="text-emerald-600">
                       +{formatBRL(
-                        localTransactions
+                        txDoMes
                           .filter((t) => t.type === 'income' && t.status === 'pending')
                           .reduce((acc, t) => acc + Math.abs(t.value), 0)
                       )}
@@ -1128,6 +1128,18 @@ function AppContent(): JSX.Element {
           ) : currentView === 'lancamentos' ? (
             <div className="space-y-6 pb-20">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+
+                {/* Seletor de mês */}
+                <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1.5 shadow-sm">
+                  <button onClick={irMesAnterior} className="p-1 rounded hover:bg-gray-100 text-gray-500 transition-colors">
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-sm font-semibold text-gray-700 min-w-[140px] text-center">{nomeMes}</span>
+                  <button onClick={irMesSeguinte} className="p-1 rounded hover:bg-gray-100 text-gray-500 transition-colors">
+                    <ChevronRightIcon className="w-4 h-4" />
+                  </button>
+                </div>
+
                 <div className="flex space-x-2 w-full sm:w-auto">
                   <button
                     onClick={() => setIsNewOpen(true)}
@@ -1163,7 +1175,7 @@ function AppContent(): JSX.Element {
               </div>
 
               <TransactionTable
-                transactions={localTransactions}
+                transactions={txDoMes}
                 categorias={categorias}
                 onDelete={(id) => setLocalTransactions(prev => prev.filter(t => t.id !== id))}
                 onEdit={(updated) => setLocalTransactions(prev => prev.map(t => t.id === updated.id ? updated : t))}

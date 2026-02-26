@@ -69,7 +69,7 @@ function ContaModal({ initial, onSave, onClose }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 max-h-[90vh] overflow-y-auto">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -119,7 +119,7 @@ function ContaModal({ initial, onSave, onClose }: {
             <label className="block text-xs font-medium text-gray-500 mb-1">
               Saldo em {dataBR} ({moeda === 'BRL' ? 'R$' : moeda === 'USD' ? 'US$' : '€'})
             </label>
-            <div className="flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-3">
               <input type="number" step="0.01" min="0" value={saldo} onChange={e => setSaldo(e.target.value)}
                 className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
               <div className="flex gap-3">
@@ -259,7 +259,7 @@ export function CadastroContas({ contas, onChange }: Props) {
       {confirmDel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/30" onClick={() => setConfirmDel(null)} />
-          <div className="relative bg-white rounded-xl shadow-xl p-6 z-10 w-80 mx-4">
+          <div className="relative bg-white rounded-xl shadow-xl p-6 z-10 w-full max-w-xs mx-4">
             <div className="flex items-start gap-3 mb-4">
               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <Trash2 className="w-5 h-5 text-red-500" />

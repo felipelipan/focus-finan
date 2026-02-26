@@ -62,7 +62,7 @@ function CatModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="bg-white rounded-2xl shadow-2xl p-6 z-10 w-full max-w-sm">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 z-10 w-full max-w-sm mx-4 max-h-[90vh] overflow-y-auto">
         <h3 className="font-bold text-gray-800 mb-4">
           {initial ? 'Editar categoria' : `Nova categoria de ${tipo === 'receita' ? 'receita' : 'despesa'}`}
         </h3>
@@ -122,7 +122,7 @@ function SubModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="bg-white rounded-2xl shadow-2xl p-6 z-10 w-full max-w-sm">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 z-10 w-full max-w-sm mx-4 max-h-[90vh] overflow-y-auto">
         <h3 className="font-bold text-gray-800 mb-1">
           {initial ? 'Editar subcategoria' : 'Nova subcategoria'}
         </h3>
@@ -452,7 +452,7 @@ export function PlanoContas({ categorias, onChange }: Props) {
       {confirmDelCat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/30" onClick={() => setConfirmDelCat(null)} />
-          <div className="bg-white rounded-xl shadow-xl p-6 z-10 w-80">
+          <div className="bg-white rounded-xl shadow-xl p-6 z-10 w-full max-w-xs mx-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <Trash2 className="w-5 h-5 text-red-500" />
