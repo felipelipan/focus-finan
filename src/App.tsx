@@ -787,7 +787,7 @@ function AppContent(): JSX.Element {
 
                 {/* Gráfico centralizado */}
                 <div className="flex justify-center mb-6">
-                  <div className="w-56 h-56">
+                  <div className="w-full max-w-[224px] h-52 mx-auto">
                     <ResponsiveContainer width="100%" height="100%">
                       <RePieChart>
                         <Pie
@@ -841,7 +841,7 @@ function AppContent(): JSX.Element {
                 <p className="text-xs text-gray-400 mb-4">Situação projetada</p>
 
                 <div className="flex justify-center mb-6">
-                  <div className="w-56 h-56">
+                  <div className="w-full max-w-[224px] h-52 mx-auto">
                     <ResponsiveContainer width="100%" height="100%">
                       <RePieChart>
                         <Pie
@@ -888,7 +888,7 @@ function AppContent(): JSX.Element {
               </Card>
 
               {/* Contas a pagar e a receber lado a lado */}
-              <div className="col-span-1 md:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="col-span-1 md:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
 
                 {/* Contas a pagar */}
                 <Card className="col-span-1">
@@ -1092,7 +1092,7 @@ function AppContent(): JSX.Element {
         {isNewOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/40" onClick={() => setIsNewOpen(false)} />
-            <div className="bg-white rounded-xl shadow-xl p-6 z-10 w-full max-w-md">
+            <div className="bg-white rounded-xl shadow-xl p-5 z-10 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
               <h3 className="text-lg font-bold mb-4">Nova transação</h3>
               <NewTransactionForm
                 categorias={categorias}
@@ -1125,7 +1125,7 @@ function AppContent(): JSX.Element {
         {isImportOpen && importPreview && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/40" onClick={() => setIsImportOpen(false)} />
-            <div className="bg-white rounded-xl shadow-xl p-6 z-10 w-full max-w-3xl max-h-[85vh] flex flex-col">
+            <div className="bg-white rounded-xl shadow-xl p-4 md:p-6 z-10 w-full max-w-3xl mx-3 md:mx-0 max-h-[90vh] flex flex-col">
               <div className="mb-4">
                 <h3 className="text-base font-bold text-gray-800">Prévia da importação — {importPreview.length} transações</h3>
                 <p className="text-xs text-gray-400 mt-1">Você pode ajustar a categoria de cada item antes de importar.</p>

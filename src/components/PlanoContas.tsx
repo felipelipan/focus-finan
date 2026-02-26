@@ -186,7 +186,7 @@ function CatRow({
   return (
     <div className="border border-gray-100 rounded-xl overflow-hidden">
       {/* Linha principal */}
-      <div className="flex items-center px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
+      <div className="flex flex-wrap items-center px-4 py-3 bg-white hover:bg-gray-50 transition-colors gap-y-2">
         <button
           onClick={() => setExpanded(e => !e)}
           className="text-gray-400 hover:text-gray-600 mr-2 transition-colors"
@@ -210,7 +210,7 @@ function CatRow({
         </span>
 
         {/* Subcategorias count */}
-        <span className="text-xs text-gray-400 mr-4">
+        <span className="hidden sm:inline text-xs text-gray-400 mr-4">
           {cat.subcategorias.length} {cat.subcategorias.length === 1 ? 'subcategoria' : 'subcategorias'}
         </span>
 
@@ -244,7 +244,7 @@ function CatRow({
       {expanded && cat.subcategorias.length > 0 && (
         <div className="border-t border-gray-50">
           {cat.subcategorias.map(sub => (
-            <div key={sub.id} className="flex items-center px-4 py-2.5 pl-12 bg-gray-50/50 border-b border-gray-50 last:border-0 hover:bg-gray-100/50 transition-colors">
+            <div key={sub.id} className="flex items-center px-3 py-2.5 pl-8 sm:pl-12 bg-gray-50/50 border-b border-gray-50 last:border-0 hover:bg-gray-100/50 transition-colors">
               <div className="w-3 h-3 rounded-full mr-3 flex-shrink-0" style={{ backgroundColor: sub.cor }} />
               <span className="text-sm text-gray-700 flex-1">{sub.nome}</span>
               <div className="flex items-center gap-1">

@@ -178,10 +178,10 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
   };
 
   return (
-    <div className="flex gap-4">
+    <div className="flex flex-col md:flex-row gap-4">
 
       {/* Painel lateral — Resultados */}
-      <div className="w-56 flex-shrink-0">
+      <div className="w-full md:w-56 md:flex-shrink-0">
         <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm text-sm">
           <div className="font-semibold text-gray-700 mb-3">Resultados (R$)</div>
           <div className="space-y-1">
@@ -279,7 +279,7 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
           <div className="w-8" />
           <div className="w-24 text-right text-xs font-semibold text-gray-400">Valor</div>
           <div className="w-10" />
-          <div className="w-28 text-right text-xs font-semibold text-gray-400 pr-8">Saldo</div>
+          <div className="hidden sm:block w-28 text-right text-xs font-semibold text-gray-400 pr-8">Saldo</div>
         </div>
 
         {/* Linhas */}
@@ -312,7 +312,7 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 mr-2 ${STATUS_COLORS[t.status] ?? 'bg-gray-300'}`} />
 
                 {/* Data */}
-                <div className="w-20 text-xs text-gray-500 flex-shrink-0">{t.date}</div>
+                <div className="w-16 sm:w-20 text-xs text-gray-500 flex-shrink-0">{t.date}</div>
 
                 {/* Descrição + badges */}
                 <div className="flex-1 min-w-0">
@@ -331,7 +331,7 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
                 </div>
 
                 {/* Valor */}
-                <div className={`w-24 text-right text-sm font-semibold ${t.value >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                <div className={`w-20 sm:w-24 text-right text-sm font-semibold flex-shrink-0 ${t.value >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                   {t.value < 0 ? '-' : ''}{formatBRL(t.value)}
                 </div>
 
@@ -344,7 +344,7 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
                 </div>
 
                 {/* Saldo acumulado */}
-                <div className={`w-28 text-right text-sm font-semibold ${t.saldoAcumulado >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                <div className={`hidden sm:block w-28 text-right text-sm font-semibold ${t.saldoAcumulado >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                   {t.saldoAcumulado < 0 ? '-' : ''}{formatBRL(t.saldoAcumulado)}
                 </div>
               </div>
@@ -357,7 +357,7 @@ export function TransactionTable({ transactions, categorias, onDelete, onEdit }:
       {editingTx && editForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setEditingTx(null)} />
-          <div className="bg-white rounded-2xl shadow-2xl p-6 z-10 w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 z-10 w-full max-w-md mx-4">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-base font-bold text-gray-800">Editar lançamento</h3>
               <button onClick={() => setEditingTx(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
