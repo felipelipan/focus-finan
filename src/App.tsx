@@ -39,6 +39,7 @@ import { TransactionTable } from './components/TransactionTable';
 import { PlanoContas, Categoria } from './components/PlanoContas';
 import { CadastroContas } from './components/CadastroContas';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { Auth } from './components/Auth';
 import { useSupabase } from './hooks/useSupabase';
 import { ViewType, Transaction, Conta } from './types';
 
@@ -233,6 +234,9 @@ function AppContent(): JSX.Element {
   const {
     loading,
     error: dbError,
+    userId,
+    userName,
+    logout,
     transactions,
     addTransaction,
     addTransactions,
@@ -437,6 +441,8 @@ function AppContent(): JSX.Element {
     );
   }
 
+  if (!userId) return <Auth />;
+
   return (
     <div className="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden">
 
@@ -475,10 +481,20 @@ function AppContent(): JSX.Element {
           <div className="flex items-center gap-3 md:gap-6">
             <Search className="w-5 h-5 text-gray-400 cursor-pointer hover:text-gray-600 hidden sm:block" />
             <Bell className="w-5 h-5 text-gray-400 cursor-pointer hover:text-gray-600" />
-            <div className="flex items-center bg-emerald-500 text-white px-2 md:px-3 py-1.5 rounded-full cursor-pointer hover:bg-emerald-600 shadow-sm">
-              <span className="text-xs md:text-sm font-medium mr-1 md:mr-2 uppercase tracking-wide hidden sm:block">Usuário</span>
-              <span className="text-xs font-bold sm:hidden">U</span>
-              <ChevronDown className="w-4 h-4" />
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-emerald-500 text-white px-2 md:px-3 py-1.5 rounded-full shadow-sm">
+                <span className="text-xs md:text-sm font-medium mr-1 md:mr-2 uppercase tracking-wide hidden sm:block">
+                  {userName || 'Usuário'}
+                </span>
+                <span className="text-xs font-bold sm:hidden">
+                  {(userName || 'U').charAt(0).toUpperCase()}
+                </span>
+                <ChevronDown className="w-4 h-4" />
+              </div>
+              <button onClick={logout}
+                className="text-xs text-gray-400 hover:text-red-500 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors hidden sm:block">
+                Sair
+              </button>
             </div>
           </div>
         </header>
