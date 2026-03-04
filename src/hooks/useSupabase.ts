@@ -108,7 +108,21 @@ export function useSupabase() {
 
         // Se não há categorias no banco, insere as padrão
         if ((catsRes.data ?? []).length === 0) {
-          await saveCategorias(initialCategorias);
+          const { data: inserted } = await supabase
+            .from('categorias')
+            .insert(initialCategorias.map(c => ({
+              nome:          c.nome,
+              tipo:          c.tipo,
+              cor:           c.cor,
+              subcategorias: c.subcategorias,
+            })))
+            .select();
+          if (inserted) {
+            setCategorias(inserted.map(r => ({
+              id: r.id, nome: r.nome, tipo: r.tipo, cor: r.cor,
+              subcategorias: r.subcategorias ?? [],
+            })));
+          }
         } else {
           setCategorias(catsRes.data!.map(r => ({
             id:            r.id,
@@ -204,21 +218,37 @@ export function useSupabase() {
   // ── Categorias ────────────────────────────────────────────────────────────
 
   async function saveCategorias(cats: Categoria[]): Promise<void> {
-    // Apaga tudo e reinserge — plano de contas muda pouco
-    await supabase.from('categorias').delete().neq('id', -1);
+    // Apaga todas as categorias existentes
+    await supabase.from('categorias').delete().gte('id', 0);
+
     if (cats.length > 0) {
+      // Não envia o id — o banco gera automaticamente via serial/sequence
       const { error } = await supabase.from('categorias').insert(
         cats.map(c => ({
-          id:            c.id,
           nome:          c.nome,
           tipo:          c.tipo,
           cor:           c.cor,
           subcategorias: c.subcategorias,
         }))
       );
-      if (error) { console.error(error); return; }
+      if (error) {
+        console.error('Erro ao salvar categorias:', error);
+        return;
+      }
+      // Recarrega do banco para pegar os IDs reais gerados
+      const { data } = await supabase.from('categorias').select('*').order('created_at');
+      if (data) {
+        setCategorias(data.map(r => ({
+          id:            r.id,
+          nome:          r.nome,
+          tipo:          r.tipo,
+          cor:           r.cor,
+          subcategorias: r.subcategorias ?? [],
+        })));
+      }
+    } else {
+      setCategorias([]);
     }
-    setCategorias(cats);
   }
 
   return {
