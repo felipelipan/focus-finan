@@ -1,7 +1,7 @@
 export type ViewType = 'visao-geral' | 'lancamentos' | 'plano-contas' | 'contas';
 
 export interface Transaction {
-  id: number;
+  id: number | string;
   date: string;
   desc: string;
   cat: string;
@@ -12,7 +12,7 @@ export interface Transaction {
 }
 
 export interface Conta {
-  id: number;
+  id: number | string;
   nome: string;
   tipo: 'corrente' | 'poupanca' | 'cartao' | 'dinheiro' | 'investimento' | 'outro';
   moeda: string;

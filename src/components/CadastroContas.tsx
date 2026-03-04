@@ -4,7 +4,9 @@ import { Conta } from '../types';
 
 interface Props {
   contas: Conta[];
-  onChange: (contas: Conta[]) => void;
+  onAdd:    (data: Omit<Conta, 'id'>) => Promise<void>;
+  onUpdate: (conta: Conta)            => Promise<void>;
+  onDelete: (id: number | string)     => Promise<void>;
 }
 
 const TIPOS = [
@@ -152,26 +154,24 @@ function ContaModal({ initial, onSave, onClose }: {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export function CadastroContas({ contas, onChange }: Props) {
-  const [nextId,     setNextId]     = useState(500);
+export function CadastroContas({ contas, onAdd, onUpdate, onDelete }: Props) {
   const [modalOpen,  setModalOpen]  = useState(false);
   const [editando,   setEditando]   = useState<Conta | null>(null);
   const [confirmDel, setConfirmDel] = useState<Conta | null>(null);
 
-  const genId = () => { const id = nextId; setNextId(n => n + 1); return id; };
-
-  const handleAdd = (data: Omit<Conta, 'id'>) => {
-    onChange([...contas, { ...data, id: genId() }]);
+  const handleAdd = async (data: Omit<Conta, 'id'>) => {
+    await onAdd(data);
     setModalOpen(false);
   };
 
-  const handleUpdate = (data: Omit<Conta, 'id'>) => {
-    onChange(contas.map(c => c.id === editando!.id ? { ...c, ...data } : c));
+  const handleUpdate = async (data: Omit<Conta, 'id'>) => {
+    if (!editando) return;
+    await onUpdate({ ...editando, ...data });
     setEditando(null);
   };
 
-  const handleDelete = (id: number) => {
-    onChange(contas.filter(c => c.id !== id));
+  const handleDelete = async (id: number | string) => {
+    await onDelete(id);
     setConfirmDel(null);
   };
 
