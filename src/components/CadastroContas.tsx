@@ -28,10 +28,10 @@ function TipoIcon({ tipo, className = 'w-5 h-5' }: { tipo: string; className?: s
   return <Icon className={className} />;
 }
 
-// Converte YYYY-MM-DD → DD/MM/AAAA
+// Converte YYYY-MM-DD → DD/MM/YY (2 dígitos no ano, consistente com o sistema)
 function isoParaBR(iso: string) {
   const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
+  return `${d}/${m}/${y.slice(-2)}`;
 }
 
 // Converte DD/MM/AAAA → YYYY-MM-DD

@@ -56,7 +56,8 @@ function formatBRL(value: number): string {
 function parseDate(d: string): Date {
   const p = d.split('/');
   if (p.length < 3) return new Date(0);
-  let y = Number(p[2]); if (y < 100) y += 2000;
+  let y = Number(p[2]);
+  if (y < 100) y += 2000;  // 26 → 2026
   return new Date(y, Number(p[1]) - 1, Number(p[0]));
 }
 
@@ -283,23 +284,18 @@ function AppContent(): JSX.Element {
   const saldoPorConta = useMemo(() => {
     const confirmadosTodos = transactions.filter(t => t.status === 'confirmed');
     const map = new Map<string, number>();
-    const contaDataInicial = new Map<string, number>();
+
+    // Parte do saldo inicial de cada conta cadastrada
     contas.forEach(c => {
       const si = c.saldoInicialTipo === 'credor' ? c.saldoInicial : -c.saldoInicial;
       map.set(c.nome, si);
-      const p = c.saldoInicialData.split('/');
-      if (p.length === 3) {
-        let y = Number(p[2]); if (y < 100) y += 2000;
-        contaDataInicial.set(c.nome, new Date(y, Number(p[1]) - 1, Number(p[0])).getTime());
-      }
     });
+
+    // Soma TODAS as confirmadas (o saldo inicial já representa o estado naquela data)
     confirmadosTodos.forEach(t => {
-      const corte = contaDataInicial.get(t.account);
-      const dtTx  = parseDate(t.date).getTime();
-      if (corte === undefined || dtTx > corte) {
-        map.set(t.account, (map.get(t.account) ?? 0) + Number(t.value));
-      }
+      map.set(t.account, (map.get(t.account) ?? 0) + Number(t.value));
     });
+
     return Array.from(map.entries()).map(([conta, saldo]) => ({ conta, saldo }));
   }, [transactions, contas]);
 
